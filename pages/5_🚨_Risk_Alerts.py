@@ -32,7 +32,7 @@ live_color = "#4caf50" if is_live      else "#ffb74d"
 st.markdown(f"""
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
     <div>
-        <div style="font-size:26px;font-weight:800;color:#e8eaed;margin-bottom:6px;">🚨 Live Risk Alerts</div>
+        <div style="font-size:26px;font-weight:800;color:#e8eaed;margin-bottom:6px;">Live Risk Alerts</div>
         <div style="color:#6b7fa3;font-size:14px">
             Real-time disruption alerts from live port congestion, marine weather, and Baltic Dry Index.
         </div>

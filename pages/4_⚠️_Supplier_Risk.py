@@ -14,7 +14,7 @@ load_dotenv()
 st.set_page_config(page_title="Supplier Risk | CargoPulse", layout="wide")
 inject_global_css()
 page_header(
-    "⚠️ Supplier Region Risk",
+    "Supplier Region Risk",
     "Composite risk score per country from export port congestion (60%), marine weather (30%), and BDI momentum (10%)."
 )
 

@@ -14,7 +14,7 @@ load_dotenv()
 st.set_page_config(page_title="Delay Forecast | CargoPulse", layout="wide")
 inject_global_css()
 page_header(
-    "⏱️ Shipment Delay Forecast",
+    "Shipment Delay Forecast",
     "Rule-based delay estimates using live congestion, marine weather, and Baltic Dry Index. Use as one signal among many."
 )
 

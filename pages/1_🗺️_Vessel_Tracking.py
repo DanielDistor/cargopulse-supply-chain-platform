@@ -14,7 +14,7 @@ load_dotenv()
 st.set_page_config(page_title="Vessel Tracking | CargoPulse", layout="wide")
 inject_global_css()
 page_header(
-    "🗺️ Live Vessel Tracking",
+    "Live Vessel Tracking",
     "Vessel positions within ~50 nautical miles of major ports via terrestrial AIS. Color = movement status."
 )
 
@@ -28,19 +28,19 @@ ANCHORED_STATUSES = {1, 5}
 UNDERWAY_STATUSES = {0, 8}
 
 COLOR_MAP = {
-    "🟢 Underway":           "#4caf50",
-    "🟡 Slow / Maneuvering": "#ffb74d",
-    "🔴 Anchored / Moored":  "#ef5350",
+    "Underway":           "#4caf50",
+    "Slow / Maneuvering": "#ffb74d",
+    "Anchored / Moored":  "#ef5350",
 }
 
 def classify_vessel(row: dict) -> str:
     nav = row.get("status")
     spd = row.get("speed") or 0.0
     if nav in ANCHORED_STATUSES or (nav not in UNDERWAY_STATUSES and spd < 1.0):
-        return "🔴 Anchored / Moored"
+        return "Anchored / Moored"
     if spd >= 5.0 or nav in UNDERWAY_STATUSES:
-        return "🟢 Underway"
-    return "🟡 Slow / Maneuvering"
+        return "Underway"
+    return "Slow / Maneuvering"
 
 
 with st.sidebar:
@@ -60,7 +60,7 @@ with st.sidebar:
         st.markdown(
             f'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'
             f'<div style="width:12px;height:12px;border-radius:50%;background:{color};flex-shrink:0"></div>'
-            f'<span style="color:#a0aab4;font-size:13px">{label.split(" ", 1)[1]}</span>'
+            f'<span style="color:#a0aab4;font-size:13px">{label}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -70,9 +70,9 @@ with st.spinner("Fetching live vessel positions..."):
 
 age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 if age is not None:
-    st.caption(f"🟢 Last updated {age // 60}m {age % 60}s ago · **{len(vessels)} vessels** tracked · Hit 🔄 Refresh in the sidebar for fresh data")
+    st.caption(f"Last updated {age // 60}m {age % 60}s ago · **{len(vessels)} vessels** tracked · Hit Refresh in the sidebar for fresh data")
 else:
-    st.caption("⚠️ No cached data yet. Fetching now...")
+    st.caption("No cached data yet. Fetching now...")
 
 if not vessels:
     st.warning("No vessel data available. Check that AISSTREAM_API_KEY is set and try refreshing.")
@@ -85,9 +85,9 @@ df["category"] = pd.Categorical(df["category"], categories=cat_order, ordered=Tr
 df = df.sort_values("category")
 
 total    = len(df)
-underway = int((df["category"] == "🟢 Underway").sum())
-slow     = int((df["category"] == "🟡 Slow / Maneuvering").sum())
-anchored = int((df["category"] == "🔴 Anchored / Moored").sum())
+underway = int((df["category"] == "Underway").sum())
+slow     = int((df["category"] == "Slow / Maneuvering").sum())
+anchored = int((df["category"] == "Anchored / Moored").sum())
 
 # ── Fleet stats row ABOVE the map — uniform fixed-height cards ────────
 def fleet_card(label: str, value: int, pct: float, dot_color: str) -> str:
