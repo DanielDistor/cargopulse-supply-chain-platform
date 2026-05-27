@@ -1,0 +1,4 @@
+.superpowers/
+notes/
+.env
+db/cache.db
