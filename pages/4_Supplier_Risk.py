@@ -67,21 +67,39 @@ for port in ports:
             "bdi_trend": bdi.get("trend", "unknown"),
         }
 
-df = pd.DataFrame(list(country_scores.values())).sort_values("score", ascending=False)
+df_full = pd.DataFrame(list(country_scores.values())).sort_values("score", ascending=False)
 
-with st.sidebar:
-    st.markdown("### Filters")
-    regions = sorted(df["region"].unique())
+# ── Inline filter ─────────────────────────────────────────────────────
+filter_col, _ = st.columns([3, 2])
+with filter_col:
+    regions = sorted(df_full["region"].unique())
     selected = st.multiselect("Filter by region", regions, default=regions)
-    df = df[df["region"].isin(selected)]
+df = df_full[df_full["region"].isin(selected)]
 
-# KPI row
+# ── KPI row ───────────────────────────────────────────────────────────
+def _kpi(label, value, sub="", sub_color="#6b7fa3", border_color=None):
+    bl = f"border-left:3px solid {border_color};" if border_color else ""
+    br = "0 10px 10px 0" if border_color else "10px"
+    return (
+        f'<div style="background:#1a1f2e;border:1px solid #263044;{bl}'
+        f'border-radius:{br};padding:16px 18px;height:96px;'
+        f'display:flex;flex-direction:column;justify-content:space-between;">'
+        f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{label}</div>'
+        f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{value}</div>'
+        f'<div style="color:{sub_color};font-size:12px">{sub}</div>'
+        f'</div>'
+    )
+
+high_crit  = int((df["score"] > 50).sum())
+bdi_chg    = bdi.get("change_pct_1d") or 0
+bdi_color  = "#ef5350" if bdi_chg > 0 else "#4caf50" if bdi_chg < 0 else "#6b7fa3"
+hc_color   = "#ef5350" if high_crit > 0 else "#4caf50"
+
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Countries Monitored", len(df))
-high_crit = int((df["score"] > 50).sum())
-c2.metric("HIGH or CRITICAL", high_crit, delta=f"{high_crit/len(df)*100:.0f}% of monitored" if len(df) else "")
-c3.metric("BDI Trend", bdi.get("trend", "N/A").upper(), delta=f"{bdi.get('change_pct_1d') or 0:.1f}% today")
-c4.metric("Avg Risk Score", f"{df['score'].mean():.0f} / 100")
+c1.markdown(_kpi("Countries Monitored", len(df), f"{len(regions)} regions"), unsafe_allow_html=True)
+c2.markdown(_kpi("HIGH or CRITICAL", high_crit, f"{high_crit/len(df)*100:.0f}% of monitored" if len(df) else "", hc_color, "#ef5350" if high_crit > 0 else None), unsafe_allow_html=True)
+c3.markdown(_kpi("BDI Trend", bdi.get("trend", "N/A").upper(), f"{bdi_chg:+.1f}% today", bdi_color), unsafe_allow_html=True)
+c4.markdown(_kpi("Avg Risk Score", f"{df['score'].mean():.0f}", "out of 100"), unsafe_allow_html=True)
 
 st.divider()
 
