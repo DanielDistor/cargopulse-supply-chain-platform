@@ -2,7 +2,7 @@
 
 **Real-time supply chain risk intelligence platform** — live vessel tracking, port congestion analytics, shipment delay forecasting, and supplier region risk monitoring.
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-app-url.streamlit.app)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cargopulse-app.streamlit.app)
 
 ---
 
