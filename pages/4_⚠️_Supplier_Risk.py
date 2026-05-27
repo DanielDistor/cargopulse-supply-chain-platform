@@ -133,6 +133,8 @@ with tab2:
                     border-radius:0 10px 10px 0;
                     padding:16px 18px;
                     margin-bottom:12px;
+                    height:160px;
+                    display:flex;flex-direction:column;justify-content:space-between;
                 ">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <span style="color:#e8eaed;font-size:16px;font-weight:700">{row['country']}</span>

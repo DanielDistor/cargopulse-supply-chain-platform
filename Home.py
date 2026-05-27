@@ -110,7 +110,7 @@ st.divider()
 # ── Regional shipping delay risk ──────────────────────────────────────
 st.markdown(
     '<div style="margin-bottom:4px;">'
-    '<span style="color:#e8eaed;font-size:16px;font-weight:700">📦 Shipping Delay Risk by Region</span>'
+    '<span style="color:#e8eaed;font-size:16px;font-weight:700">Shipping Delay Risk by Region</span>'
     '</div>'
     '<div style="color:#5a6a7e;font-size:12px;margin-bottom:16px;">'
     'Probability of port-related shipping delays for goods <em>originating</em> from each region. '
@@ -176,7 +176,7 @@ for row in rows:
 st.divider()
 
 # ── Spotlight: one key signal per dimension ───────────────────────────
-st.markdown('<div style="color:#e8eaed;font-size:16px;font-weight:700;margin-bottom:12px;">🔎 Current Highlights</div>', unsafe_allow_html=True)
+st.markdown('<div style="color:#e8eaed;font-size:16px;font-weight:700;margin-bottom:12px;">Current Highlights</div>', unsafe_allow_html=True)
 
 top_port    = df_cong.iloc[0] if not df_cong.empty else None
 country_scores: dict = {}

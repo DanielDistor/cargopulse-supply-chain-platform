@@ -89,12 +89,31 @@ underway = int((df["category"] == "🟢 Underway").sum())
 slow     = int((df["category"] == "🟡 Slow / Maneuvering").sum())
 anchored = int((df["category"] == "🔴 Anchored / Moored").sum())
 
-# ── Fleet stats row ABOVE the map ────────────────────────────────────
+# ── Fleet stats row ABOVE the map — uniform fixed-height cards ────────
+def fleet_card(label: str, value: int, pct: float, dot_color: str) -> str:
+    dot = f'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{dot_color};margin-right:6px;vertical-align:middle;flex-shrink:0"></span>'
+    return (
+        f'<div style="background:#1a1f2e;border:1px solid #263044;border-radius:10px;'
+        f'padding:16px 18px;height:96px;display:flex;flex-direction:column;justify-content:space-between;">'
+        f'<div style="display:flex;align-items:center;color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{dot}{label}</div>'
+        f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{value}</div>'
+        f'<div style="color:{dot_color};font-size:12px">{pct:.0f}% of fleet</div>'
+        f'</div>'
+    )
+
 s1, s2, s3, s4 = st.columns(4)
-s1.metric("Total Vessels",      total)
-s2.metric("🟢 Underway",        underway,  delta=f"{underway/total*100:.0f}% of fleet" if total else "")
-s3.metric("🟡 Slow / Maneuvering", slow,   delta=f"{slow/total*100:.0f}% of fleet"     if total else "")
-s4.metric("🔴 Anchored / Moored",  anchored, delta=f"{anchored/total*100:.0f}% of fleet" if total else "")
+s1.markdown(
+    f'<div style="background:#1a1f2e;border:1px solid #263044;border-radius:10px;'
+    f'padding:16px 18px;height:96px;display:flex;flex-direction:column;justify-content:space-between;">'
+    f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">Total Vessels</div>'
+    f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{total}</div>'
+    f'<div style="color:#6b7fa3;font-size:12px">tracked right now</div>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
+s2.markdown(fleet_card("Underway",          underway,  underway/total*100  if total else 0, "#4caf50"), unsafe_allow_html=True)
+s3.markdown(fleet_card("Slow / Maneuvering", slow,     slow/total*100      if total else 0, "#ffb74d"), unsafe_allow_html=True)
+s4.markdown(fleet_card("Anchored / Moored",  anchored, anchored/total*100  if total else 0, "#ef5350"), unsafe_allow_html=True)
 
 st.divider()
 
