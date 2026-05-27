@@ -15,7 +15,7 @@ st.set_page_config(page_title="Vessel Map | CargoPulse", layout="wide")
 inject_global_css()
 page_header(
     "🗺️ Live Vessel Map",
-    "Vessel positions within ~50 nautical miles of major ports via terrestrial AIS. Port congestion rings show live scoring."
+    "Vessel positions within ~50 nautical miles of major ports via terrestrial AIS. Color = movement status."
 )
 
 PORTS_PATH = os.path.join(os.path.dirname(__file__), "..", "db", "ports.json")
@@ -24,23 +24,56 @@ with open(PORTS_PATH) as f:
 
 bounding_boxes = [aisstream.make_port_bounding_box(p["lat"], p["lon"]) for p in ports]
 
+# AIS NavigationalStatus codes
+ANCHORED_STATUSES = {1, 5}   # At anchor, Moored
+UNDERWAY_STATUSES = {0, 8}   # Under way engine, Under way sailing
+
+COLOR_MAP = {
+    "🟢 Underway":            "#4caf50",
+    "🟡 Slow / Maneuvering":  "#ffb74d",
+    "🔴 Anchored / Moored":   "#ef5350",
+}
+
+def classify_vessel(row: dict) -> str:
+    nav = row.get("status")
+    spd = row.get("speed") or 0.0
+    if nav in ANCHORED_STATUSES or (nav not in UNDERWAY_STATUSES and spd < 1.0):
+        return "🔴 Anchored / Moored"
+    if spd >= 5.0 or nav in UNDERWAY_STATUSES:
+        return "🟢 Underway"
+    return "🟡 Slow / Maneuvering"
+
+
 with st.sidebar:
     st.markdown("### Controls")
     show_ports = st.toggle("Show port congestion rings", value=True)
     show_weather = st.toggle("Show wave height overlay", value=False)
     duration = st.slider("AIS fetch duration (seconds)", min_value=5, max_value=30, value=10)
-    if st.button("🔄 Refresh Data"):
+
+    st.markdown("---")
+    if st.button("🔄 Refresh Data", use_container_width=True, type="primary"):
         from db.cache import _connect
         with _connect() as conn:
             conn.execute("DELETE FROM cache WHERE key = ?", (aisstream.VESSEL_CACHE_KEY,))
         st.rerun()
+
+    st.markdown("---")
+    st.markdown("#### Legend")
+    for label, color in COLOR_MAP.items():
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'
+            f'<div style="width:12px;height:12px;border-radius:50%;background:{color};flex-shrink:0"></div>'
+            f'<span style="color:#a0aab4;font-size:13px">{label.split(" ", 1)[1]}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 with st.spinner("Fetching live vessel positions..."):
     vessels = aisstream.get_vessels(bounding_boxes, duration_seconds=duration)
 
 age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 if age is not None:
-    st.caption(f"🟢 Last updated {age // 60}m {age % 60}s ago · **{len(vessels)} vessels** tracked")
+    st.caption(f"🟢 Last updated {age // 60}m {age % 60}s ago · **{len(vessels)} vessels** tracked · Hit 🔄 Refresh in the sidebar for fresh data")
 else:
     st.caption("⚠️ No cached data yet. Fetching now...")
 
@@ -49,27 +82,53 @@ if not vessels:
     st.stop()
 
 df = pd.DataFrame(vessels).dropna(subset=["lat", "lon"])
+df["category"] = df.apply(classify_vessel, axis=1)
+
+# Ordered categories so legend is consistent
+cat_order = list(COLOR_MAP.keys())
+df["category"] = pd.Categorical(df["category"], categories=cat_order, ordered=True)
+df = df.sort_values("category")
 
 map_col, stats_col = st.columns([3, 1])
 
 with map_col:
     fig = px.scatter_mapbox(
         df, lat="lat", lon="lon",
+        color="category",
+        color_discrete_map=COLOR_MAP,
+        category_orders={"category": cat_order},
         hover_name="name",
-        hover_data={"mmsi": True, "speed": True, "heading": True, "lat": False, "lon": False},
-        color_discrete_sequence=["#00d4ff"],
+        hover_data={
+            "mmsi": True,
+            "speed": True,
+            "heading": True,
+            "category": True,
+            "lat": False,
+            "lon": False,
+        },
         zoom=1, height=600,
         mapbox_style="carto-darkmatter",
     )
-    fig.update_traces(marker=dict(size=6, opacity=0.85))
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0}, paper_bgcolor="#1a1f2e")
+    fig.update_traces(marker=dict(size=6, opacity=0.9))
+    fig.update_layout(
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        paper_bgcolor="#1a1f2e",
+        legend=dict(
+            title="Vessel Status",
+            bgcolor="rgba(26,31,46,0.85)",
+            bordercolor="#263044",
+            borderwidth=1,
+            font=dict(color="#a0aab4", size=12),
+            x=0.01, y=0.99,
+            xanchor="left", yanchor="top",
+        ),
+    )
 
     if show_ports:
-        # Score all ports and overlay congestion rings
         with st.spinner("Loading port congestion data..."):
             congestion_data = cong_svc.get_all_port_congestion(vessels)
         cong_map = {c["name"]: c for c in congestion_data}
-        color_map = {"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"}
+        port_color_map = {"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"}
         for port in ports:
             cong = cong_map.get(port["name"], {})
             score = cong.get("score", 0)
@@ -79,8 +138,8 @@ with map_col:
                 mode="markers",
                 marker=dict(
                     size=max(10, score / 4 + 8),
-                    color=color_map.get(label, "#9e9e9e"),
-                    opacity=0.45,
+                    color=port_color_map.get(label, "#9e9e9e"),
+                    opacity=0.4,
                 ),
                 showlegend=False,
                 hovertemplate=(
@@ -110,6 +169,7 @@ with map_col:
                                 showscale=True, colorbar=dict(title="Wave (m)"), opacity=0.5),
                     name="Wave height",
                     hovertemplate="Wave: %{marker.color:.1f} m<extra></extra>",
+                    showlegend=False,
                 ))
         except ImportError:
             st.warning("Weather service is not available.")
@@ -119,16 +179,17 @@ with map_col:
 with stats_col:
     st.markdown("#### Fleet Stats")
 
-    # Speed distribution
     speeds = df["speed"].dropna()
-    anchored = int((speeds < 1.0).sum())
-    slow = int(((speeds >= 1.0) & (speeds < 5.0)).sum())
-    underway = int((speeds >= 5.0).sum())
-    total = len(speeds)
+    underway  = int((df["category"] == "🟢 Underway").sum())
+    slow      = int((df["category"] == "🟡 Slow / Maneuvering").sum())
+    anchored  = int((df["category"] == "🔴 Anchored / Moored").sum())
+    total     = len(df)
 
-    for label, count, color in [("Anchored / Drifting", anchored, "#ef5350"),
-                                  ("Slow / Maneuvering", slow, "#ffb74d"),
-                                  ("Underway", underway, "#4caf50")]:
+    for label, count, color in [
+        ("Underway",           underway,  "#4caf50"),
+        ("Slow / Maneuvering", slow,      "#ffb74d"),
+        ("Anchored / Moored",  anchored,  "#ef5350"),
+    ]:
         pct = count / total * 100 if total else 0
         st.markdown(
             f'<div style="padding:10px 14px;margin:6px 0;background:#1a1f2e;border-left:3px solid {color};border-radius:0 8px 8px 0;">'
@@ -142,7 +203,6 @@ with stats_col:
 
     st.markdown("---")
 
-    # Speed histogram
     if len(speeds) > 0:
         fig_speed = px.histogram(speeds, nbins=20, height=200,
                                   labels={"value": "Speed (knots)", "count": "Vessels"})
@@ -159,7 +219,7 @@ with stats_col:
         st.plotly_chart(fig_speed, use_container_width=True)
 
     st.markdown("#### All Vessels")
-    st.dataframe(
-        df[["name", "speed", "heading"]].sort_values("speed", ascending=False),
-        use_container_width=True, height=200,
-    )
+    display_df = df[["name", "category", "speed", "heading"]].copy()
+    display_df.columns = ["Vessel", "Status", "Speed (kn)", "Heading"]
+    st.dataframe(display_df.sort_values("Speed (kn)", ascending=False),
+                 use_container_width=True, height=200, hide_index=True)
