@@ -85,7 +85,7 @@ c4.metric("Avg Risk Score", f"{df['score'].mean():.0f} / 100")
 
 st.divider()
 
-tab1, tab2, tab3 = st.tabs(["🗺️ World Heatmap", "🚨 Top At-Risk Countries", "📊 Regional Breakdown"])
+tab1, tab2, tab3 = st.tabs(["World Heatmap", "Top At-Risk Countries", "Regional Breakdown"])
 
 with tab1:
     fig_map = px.choropleth(

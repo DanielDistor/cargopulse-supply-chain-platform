@@ -60,13 +60,13 @@ def compute_delay(origin: str, destination: str, cong_map: dict, port_map: dict,
         "origin": origin,
         "destination": destination,
         "delay": total,
-        "status": "⚫ Critical" if total >= 5 else "🔴 High" if total >= 3.5 else "🟡 Moderate" if total >= 2 else "🟢 Low",
+        "status": "Critical" if total >= 5 else "High" if total >= 3.5 else "Moderate" if total >= 2 else "Low",
         "origin_score": origin_data.get("score", 0),
         "dest_score": dest_data.get("score", 0),
     }
 
 
-tab1, tab2 = st.tabs(["🔍 Route Calculator", "🌐 Global Trade Routes"])
+tab1, tab2 = st.tabs(["Route Calculator", "Global Trade Routes"])
 
 with tab1:
     col1, col2 = st.columns(2)

@@ -104,6 +104,18 @@ def inject_global_css() -> None:
             border-radius: 8px;
         }
 
+        /* ── Multiselect selected pills — override bright cyan default ── */
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] {
+            background-color: #1e2736 !important;
+            border: 1px solid #374357 !important;
+        }
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] span {
+            color: #a0aab4 !important;
+        }
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] [role="button"] {
+            color: #6b7fa3 !important;
+        }
+
         /* ── Slider ── */
         [data-testid="stSlider"] [class*="thumb"] { background-color: #00d4ff !important; }
         [data-testid="stSlider"] [class*="track"] { background-color: #00d4ff !important; }
@@ -114,14 +126,10 @@ def inject_global_css() -> None:
 
 
 def page_header(title: str, subtitle: str) -> None:
-    """Render a styled page header with accent line."""
+    """Render a styled page header."""
     st.markdown(
         f"""
-        <div style="
-            border-left: 4px solid #00d4ff;
-            padding-left: 16px;
-            margin-bottom: 8px;
-        ">
+        <div style="margin-bottom: 8px;">
             <h1 style="margin:0; padding:0; color:#e8eaed; font-size:2rem; font-weight:800;">{title}</h1>
             <p style="margin:4px 0 0 0; color:#5a6a7e; font-size:14px;">{subtitle}</p>
         </div>

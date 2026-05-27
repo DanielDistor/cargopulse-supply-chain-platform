@@ -47,9 +47,8 @@ with st.sidebar:
     st.markdown("### Controls")
     show_ports   = st.toggle("Show port congestion rings", value=True)
     show_weather = st.toggle("Show wave height overlay",   value=False)
-    duration     = st.slider("AIS fetch duration (seconds)", min_value=5, max_value=30, value=10)
     st.markdown("---")
-    if st.button("🔄 Refresh Data", use_container_width=True, type="primary"):
+    if st.button("Refresh Data", use_container_width=True, type="primary"):
         from db.cache import _connect
         with _connect() as conn:
             conn.execute("DELETE FROM cache WHERE key = ?", (aisstream.VESSEL_CACHE_KEY,))
@@ -66,7 +65,7 @@ with st.sidebar:
         )
 
 with st.spinner("Fetching live vessel positions..."):
-    vessels = aisstream.get_vessels(bounding_boxes, duration_seconds=duration)
+    vessels = aisstream.get_vessels(bounding_boxes)
 
 age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 if age is not None:
@@ -188,27 +187,9 @@ st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
-# ── Speed histogram + vessel table ────────────────────────────────────
-hist_col, table_col = st.columns([1, 2])
-
-with hist_col:
-    speeds = df["speed"].dropna()
-    if len(speeds) > 0:
-        fig_speed = px.histogram(speeds, nbins=20, height=240,
-                                  labels={"value": "Speed (knots)", "count": "Vessels"})
-        fig_speed.update_traces(marker_color="#00d4ff", opacity=0.8)
-        fig_speed.update_layout(
-            margin=dict(l=10, r=10, t=40, b=10),
-            paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e", font_color="#a0aab4",
-            xaxis=dict(gridcolor="#1e2736", title="Speed (kn)"),
-            yaxis=dict(gridcolor="#1e2736", title=""),
-            title="Speed Distribution", title_font_color="#e8eaed", showlegend=False,
-        )
-        st.plotly_chart(fig_speed, use_container_width=True)
-
-with table_col:
-    st.markdown("#### All Vessels")
-    display_df = df[["name", "category", "speed", "heading"]].copy()
-    display_df.columns = ["Vessel", "Status", "Speed (kn)", "Heading"]
-    st.dataframe(display_df.sort_values("Speed (kn)", ascending=False),
-                 use_container_width=True, height=240, hide_index=True)
+# ── Vessel table ──────────────────────────────────────────────────────
+st.markdown('<div style="color:#e8eaed;font-size:15px;font-weight:700;margin-bottom:8px;">All Vessels</div>', unsafe_allow_html=True)
+display_df = df[["name", "category", "speed", "heading"]].copy()
+display_df.columns = ["Vessel", "Status", "Speed (kn)", "Heading"]
+st.dataframe(display_df.sort_values("Speed (kn)", ascending=False),
+             use_container_width=True, height=320, hide_index=True)

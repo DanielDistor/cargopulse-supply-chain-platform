@@ -30,7 +30,6 @@ with st.sidebar:
     st.markdown("### Filters")
     regions = sorted({p["region"] for p in ports})
     selected_regions = st.multiselect("Region", regions, default=regions)
-    top_n = st.slider("Show top N ports", 5, 50, 30)
     view_mode = st.radio("View mode", ["Rankings", "World Map", "Compare Ports"], index=0)
 
 with st.spinner("Scoring ports..."):
@@ -38,18 +37,36 @@ with st.spinner("Scoring ports..."):
     congestion_data = cong_svc.get_all_port_congestion(vessels)
 
 df_all = pd.DataFrame(congestion_data)
-df = df_all[df_all["region"].isin(selected_regions)].head(top_n)
+df = df_all[df_all["region"].isin(selected_regions)]
 
 if df.empty:
     st.warning("No ports match the selected regions. Please select at least one region.")
     st.stop()
 
 # KPI row
+critical_n  = int((df_all["score"] >= 86).sum())
+high_n      = int(((df_all["score"] >= 61) & (df_all["score"] < 86)).sum())
+elevated_n  = int(((df_all["score"] >= 31) & (df_all["score"] < 61)).sum())
+
+def _kpi(label, value, sub="", sub_color="#6b7fa3"):
+    return (
+        f'<div style="background:#1a1f2e;border:1px solid #263044;border-radius:10px;'
+        f'padding:16px 18px;height:96px;display:flex;flex-direction:column;justify-content:space-between;">'
+        f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{label}</div>'
+        f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{value}</div>'
+        f'<div style="color:{sub_color};font-size:12px">{sub}</div>'
+        f'</div>'
+    )
+
+crit_color = "#ef5350" if critical_n > 0 else "#4caf50"
+high_color = "#ffb74d" if high_n > 0 else "#4caf50"
+elev_color = "#00d4ff" if elevated_n > 0 else "#4caf50"
+
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Ports Scored", len(df_all))
-col2.metric("Critical", int((df_all["score"] >= 86).sum()))
-col3.metric("High Risk", int(((df_all["score"] >= 61) & (df_all["score"] < 86)).sum()))
-col4.metric("Avg Score", f"{df_all['score'].mean():.0f} / 100")
+col1.markdown(_kpi("Ports Scored", len(df_all), f"across {len(set(p['region'] for p in ports))} regions"), unsafe_allow_html=True)
+col2.markdown(_kpi("Critical", critical_n, "score ≥ 86", crit_color), unsafe_allow_html=True)
+col3.markdown(_kpi("High Risk", high_n, "score 61–85", high_color), unsafe_allow_html=True)
+col4.markdown(_kpi("Under Watch", elevated_n, "score 31–60", elev_color), unsafe_allow_html=True)
 
 st.divider()
 
@@ -153,18 +170,34 @@ elif view_mode == "Compare Ports":
         st.plotly_chart(fig_radar, use_container_width=True)
 
 else:  # Rankings view
-    # Congestion bar chart
+    # Horizontal bar chart — top 20 by congestion score
+    df_chart = df.sort_values("score", ascending=False).head(20)
+    df_chart_asc = df_chart.sort_values("score", ascending=True)  # chart renders bottom→top
+    color_map_bar = {"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"}
+
     fig = px.bar(
-        df, x="name", y="score", color="label",
-        color_discrete_map={"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"},
-        labels={"score": "Congestion Score (0–100)", "name": "Port"},
-        height=420,
+        df_chart_asc,
+        x="score",
+        y="name",
+        color="label",
+        orientation="h",
+        color_discrete_map=color_map_bar,
+        text="score",
+        labels={"score": "Congestion Score (0–100)", "name": "Port", "label": "Status"},
+        height=max(420, len(df_chart_asc) * 26),
+        hover_data={"vessel_count": True, "label": True, "name": False, "score": False},
     )
+    fig.update_traces(textposition="outside", textfont_color="#a0aab4")
     fig.update_layout(
-        xaxis_tickangle=-40,
+        xaxis=dict(range=[0, 115], gridcolor="#1e2736", title="Congestion Score (0–100)"),
+        yaxis=dict(
+            gridcolor="#1e2736",
+            categoryorder="array",
+            categoryarray=df_chart_asc["name"].tolist(),
+        ),
         paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e", font_color="#a0aab4",
-        xaxis=dict(gridcolor="#1e2736"), yaxis=dict(gridcolor="#1e2736"),
-        legend=dict(bgcolor="#1a1f2e", bordercolor="#263044"),
+        legend=dict(title="Status", bgcolor="#1a1f2e", bordercolor="#263044", font=dict(color="#a0aab4")),
+        margin=dict(l=10, r=80, t=10, b=10),
     )
     st.plotly_chart(fig, use_container_width=True)
 
