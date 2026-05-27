@@ -1,14 +1,12 @@
 import json
 import os
 import streamlit as st
-import plotly.graph_objects as go
 import pandas as pd
 from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc
 from services.shipping_rates import get_bdi
 from db import cache
 from components.styles import inject_global_css
-
 
 load_dotenv()
 
@@ -26,14 +24,24 @@ with open(PORTS_PATH) as f:
 
 bounding_boxes = [aisstream.make_port_bounding_box(p["lat"], p["lon"]) for p in ports]
 
-# ── Load all data ─────────────────────────────────────────────────────
+# ── Load data ─────────────────────────────────────────────────────────
 with st.spinner("Loading live intelligence feeds..."):
-    vessels        = aisstream.get_vessels(bounding_boxes)
+    vessels         = aisstream.get_vessels(bounding_boxes)
     congestion_data = cong_svc.get_all_port_congestion(vessels)
-    bdi            = get_bdi()
+    bdi             = get_bdi()
 
-df_cong = pd.DataFrame(congestion_data)
+df_cong    = pd.DataFrame(congestion_data)
+cong_map   = {c["name"]: c for c in congestion_data}
 vessel_age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
+
+critical_n = int((df_cong["score"] >= 86).sum()) if not df_cong.empty else 0
+high_n     = int(((df_cong["score"] >= 61) & (df_cong["score"] < 86)).sum()) if not df_cong.empty else 0
+alert_count = int((df_cong["score"] >= 60).sum()) + (1 if bdi.get("trend") == "rising" else 0)
+alert_cost  = round(sum(
+    next((p["capacity_baseline"] for p in ports if p["name"] == row["name"]), 30)
+    * row["score"] / 100 * 0.35
+    for _, row in df_cong[df_cong["score"] >= 60].iterrows()
+), 0)
 
 # ── Connection status ─────────────────────────────────────────────────
 is_connected = vessel_age is not None
@@ -62,135 +70,157 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Data freshness bar
 age_str = f"{vessel_age // 60}m {vessel_age % 60}s ago" if vessel_age else "fetching..."
-bdi_val = bdi.get("value", "N/A")
 st.markdown(
     f'<div style="display:flex;gap:24px;padding:8px 14px;background:#1a1f2e;border:1px solid #263044;'
-    f'border-radius:8px;margin-bottom:20px;flex-wrap:wrap;">'
+    f'border-radius:8px;margin-bottom:24px;flex-wrap:wrap;">'
     f'<span style="color:#5a6a7e;font-size:12px">🛰 <b style="color:#a0aab4">AIS</b> · {age_str}</span>'
     f'<span style="color:#5a6a7e;font-size:12px">🌊 <b style="color:#a0aab4">Marine Weather</b> · Open-Meteo (3h cache)</span>'
-    f'<span style="color:#5a6a7e;font-size:12px">📈 <b style="color:#a0aab4">BDI</b> · {bdi_val} ({bdi.get("trend", "N/A")} trend, daily)</span>'
+    f'<span style="color:#5a6a7e;font-size:12px">📈 <b style="color:#a0aab4">BDI</b> · {bdi.get("value","N/A")} ({bdi.get("trend","N/A")} trend, daily)</span>'
     f'<span style="color:#5a6a7e;font-size:12px">🗺 <b style="color:#a0aab4">Ports Monitored</b> · {len(ports)}</span>'
     f'</div>',
     unsafe_allow_html=True,
 )
 
-# ── Composite global risk score ───────────────────────────────────────
-avg_cong   = df_cong["score"].mean() if not df_cong.empty else 0
-max_cong   = df_cong["score"].max()  if not df_cong.empty else 0
-bdi_factor = 15 if bdi.get("trend") == "rising" else 0
-critical_n = int((df_cong["score"] >= 86).sum()) if not df_cong.empty else 0
-high_n     = int(((df_cong["score"] >= 61) & (df_cong["score"] < 86)).sum()) if not df_cong.empty else 0
-
-global_score = min(100, round(avg_cong * 0.5 + max_cong * 0.3 + bdi_factor + critical_n * 1.5))
-
-if global_score >= 75:
-    risk_label, risk_color = "HIGH RISK",    "#ef5350"
-elif global_score >= 50:
-    risk_label, risk_color = "ELEVATED",     "#ffb74d"
-elif global_score >= 25:
-    risk_label, risk_color = "MODERATE",     "#00d4ff"
-else:
-    risk_label, risk_color = "NORMAL",       "#4caf50"
-
-# ── Layout: gauge left, spotlight cards right ─────────────────────────
-gauge_col, cards_col = st.columns([1, 2])
-
-with gauge_col:
-    fig_gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=global_score,
-        title={"text": "Global Risk Score", "font": {"color": "#a0aab4", "size": 14}},
-        number={"font": {"color": risk_color, "size": 48}, "suffix": "/100"},
-        gauge={
-            "axis": {"range": [0, 100], "tickcolor": "#5a6a7e", "tickfont": {"color": "#5a6a7e"}},
-            "bar":  {"color": risk_color, "thickness": 0.25},
-            "bgcolor": "#1a1f2e",
-            "bordercolor": "#263044",
-            "steps": [
-                {"range": [0,  25],  "color": "#0d2818"},
-                {"range": [25, 50],  "color": "#0d2020"},
-                {"range": [50, 75],  "color": "#2a1a0a"},
-                {"range": [75, 100], "color": "#2a0a0a"},
-            ],
-            "threshold": {"line": {"color": risk_color, "width": 3}, "value": global_score},
-        },
-    ))
-    fig_gauge.update_layout(
-        height=260, margin=dict(l=20, r=20, t=40, b=10),
-        paper_bgcolor="#1a1f2e", font_color="#a0aab4",
-    )
-    st.plotly_chart(fig_gauge, use_container_width=True)
-    st.markdown(
-        f'<div style="text-align:center;margin-top:-10px;">'
-        f'<span style="background:{risk_color}22;color:{risk_color};padding:4px 16px;'
-        f'border-radius:20px;font-size:13px;font-weight:700;border:1px solid {risk_color}44">'
-        f'{risk_label}</span></div>',
-        unsafe_allow_html=True,
+# ── KPI row — uniform fixed-height cards ─────────────────────────────
+def kpi_card(label: str, value: str, sub: str, sub_color: str = "#6b7fa3") -> str:
+    return (
+        f'<div style="background:#1a1f2e;border:1px solid #263044;border-radius:10px;'
+        f'padding:16px 18px;height:96px;display:flex;flex-direction:column;justify-content:space-between;">'
+        f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{label}</div>'
+        f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{value}</div>'
+        f'<div style="color:{sub_color};font-size:12px">{sub}</div>'
+        f'</div>'
     )
 
-with cards_col:
-    # Spotlight: biggest signal from each dimension
-    top_port    = df_cong.iloc[0] if not df_cong.empty else None
-    country_scores = {}
-    for port in ports:
-        cong = df_cong[df_cong["name"] == port["name"]]
-        if not cong.empty:
-            sc = int(cong.iloc[0]["score"])
-            if port["country"] not in country_scores or sc > country_scores[port["country"]]["score"]:
-                country_scores[port["country"]] = {"score": sc, "port": port["name"]}
-    top_country = max(country_scores.items(), key=lambda x: x[1]["score"]) if country_scores else None
+bdi_chg     = bdi.get("change_pct_1d") or 0
+bdi_color   = "#ef5350" if bdi_chg > 0 else "#4caf50" if bdi_chg < 0 else "#6b7fa3"
+crit_color  = "#ef5350" if critical_n > 0 else "#4caf50"
+alert_color = "#ef5350" if alert_count > 3 else "#ffb74d" if alert_count > 0 else "#4caf50"
 
-    # Alert count from congestion threshold
-    alert_count = int((df_cong["score"] >= 60).sum()) + (1 if bdi.get("trend") == "rising" else 0)
-    alert_cost  = round(sum(
-        port_map_local["capacity_baseline"] * row["score"] / 100 * 0.35
-        for _, row in df_cong[df_cong["score"] >= 60].iterrows()
-        for port_map_local in [next((p for p in ports if p["name"] == row["name"]), {"capacity_baseline": 30})]
-    ), 0)
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.markdown(kpi_card("Vessels Tracked",  f"{len(vessels):,}",      f"across {len(ports)} ports"),          unsafe_allow_html=True)
+c2.markdown(kpi_card("Critical Ports",   str(critical_n),           f"{high_n} high risk", crit_color),    unsafe_allow_html=True)
+c3.markdown(kpi_card("Active Alerts",    str(alert_count),          f"${alert_cost:.0f}M exposure", alert_color), unsafe_allow_html=True)
+c4.markdown(kpi_card("BDI",             str(bdi.get("value","—")), f"{bdi_chg:+.1f}% today", bdi_color),  unsafe_allow_html=True)
+c5.markdown(kpi_card("BDI Trend",        bdi.get("trend","—").upper(), "freight rate direction"),           unsafe_allow_html=True)
 
-    spotlight_items = []
-    if top_port is not None:
-        lc = {"Clear":"#4caf50","Moderate":"#ffb74d","High":"#ef5350","Critical":"#b71c1c"}.get(top_port["label"],"#a0aab4")
-        spotlight_items.append(("📊 Most Congested Port",
-            f"<span style='color:{lc};font-weight:700'>{top_port['name']}</span> — "
-            f"<span style='color:{lc}'>{int(top_port['score'])}/100 · {top_port['label']}</span>",
-            "→ Port Congestion"))
-    if top_country:
-        country, data = top_country
-        lc2 = "#b71c1c" if data["score"] >= 86 else "#ef5350" if data["score"] >= 61 else "#ffb74d"
-        spotlight_items.append(("⚠️ Highest Risk Country",
-            f"<span style='color:{lc2};font-weight:700'>{country}</span> — "
-            f"<span style='color:{lc2}'>composite risk {data['score']}/100 via {data['port']}</span>",
-            "→ Supplier Risk"))
-    bdi_c = "#ef5350" if bdi.get("trend") == "rising" else "#4caf50"
-    spotlight_items.append(("📈 Freight Market",
-        f"<span style='color:{bdi_c};font-weight:700'>BDI {bdi.get('value','N/A')}</span> — "
-        f"<span style='color:{bdi_c}'>{bdi.get('trend','N/A')} trend · {bdi.get('change_pct_1d') or 0:.1f}% today</span>",
-        "→ Delay Forecast"))
-    spotlight_items.append(("🚨 Active Risk Alerts",
-        f"<span style='color:#ef5350;font-weight:700'>{alert_count} alerts</span> — "
-        f"<span style='color:#ef5350'>estimated ${alert_cost:.0f}M total exposure</span>",
-        "→ Risk Alerts"))
+st.divider()
 
-    for title, body, link in spotlight_items:
-        st.markdown(
-            f'<div style="background:#1a1f2e;border:1px solid #263044;border-left:3px solid #00d4ff;'
-            f'border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:10px;">'
-            f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">{title}</div>'
-            f'<div style="font-size:14px;margin-bottom:4px">{body}</div>'
-            f'<div style="color:#00d4ff;font-size:12px">{link}</div>'
+# ── Regional shipping delay risk ──────────────────────────────────────
+st.markdown(
+    '<div style="margin-bottom:4px;">'
+    '<span style="color:#e8eaed;font-size:16px;font-weight:700">📦 Shipping Delay Risk by Region</span>'
+    '</div>'
+    '<div style="color:#5a6a7e;font-size:12px;margin-bottom:16px;">'
+    'Probability of port-related shipping delays for goods <em>originating</em> from each region. '
+    'Score = export port congestion (60%) + marine weather severity at key ports (30%) + BDI freight pressure (10%).'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+# Group ports by region and compute regional score
+regions_data: dict = {}
+for port in ports:
+    r = port["region"]
+    if r not in regions_data:
+        regions_data[r] = []
+    regions_data[r].append(port)
+
+def region_delay_risk(region_ports: list, bdi: dict) -> dict:
+    scores = [cong_map.get(p["name"], {}).get("score", 0) for p in region_ports]
+    if not scores:
+        return {"score": 0, "label": "No Data", "color": "#5a6a7e", "top_port": "—", "top_score": 0}
+    avg_s  = sum(scores) / len(scores)
+    max_s  = max(scores)
+    bdi_b  = 10 if bdi.get("trend") == "rising" else 0
+    score  = min(100, round(avg_s * 0.6 + max_s * 0.3 + bdi_b * 0.1))
+    top_idx = scores.index(max_s)
+    top_port = region_ports[top_idx]["name"]
+    if score >= 75:   label, color = "HIGH",     "#ef5350"
+    elif score >= 50: label, color = "ELEVATED", "#ffb74d"
+    elif score >= 25: label, color = "MODERATE", "#00d4ff"
+    else:             label, color = "NORMAL",   "#4caf50"
+    return {"score": score, "label": label, "color": color,
+            "top_port": top_port, "top_score": int(max_s), "port_count": len(region_ports)}
+
+region_results = {r: region_delay_risk(ps, bdi) for r, ps in regions_data.items()}
+sorted_regions = sorted(region_results.items(), key=lambda x: x[1]["score"], reverse=True)
+
+# Render as uniform cards — 3 per row
+rows = [sorted_regions[i:i+3] for i in range(0, len(sorted_regions), 3)]
+for row in rows:
+    cols = st.columns(3)
+    for col, (region, data) in zip(cols, row):
+        c = data["color"]
+        col.markdown(
+            f'<div style="background:#1a1f2e;border:1px solid #263044;border-left:4px solid {c};'
+            f'border-radius:0 10px 10px 0;padding:16px 18px;height:130px;'
+            f'display:flex;flex-direction:column;justify-content:space-between;">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+            f'  <span style="color:#e8eaed;font-size:14px;font-weight:700">{region}</span>'
+            f'  <span style="background:{c}22;color:{c};padding:2px 9px;border-radius:12px;'
+            f'         font-size:11px;font-weight:700">{data["label"]}</span>'
+            f'</div>'
+            f'<div style="color:{c};font-size:28px;font-weight:800;line-height:1">'
+            f'  {data["score"]}<span style="color:#5a6a7e;font-size:13px">/100</span>'
+            f'</div>'
+            f'<div style="color:#5a6a7e;font-size:12px">'
+            f'  Worst port: <span style="color:#a0aab4">{data["top_port"]}</span> '
+            f'  ({data["top_score"]}/100) · {data["port_count"]} ports'
+            f'</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
 st.divider()
 
-# ── Platform summary KPIs ─────────────────────────────────────────────
-k1, k2, k3, k4, k5 = st.columns(5)
-k1.metric("Vessels Tracked",    f"{len(vessels):,}")
-k2.metric("Ports Monitored",    len(ports))
-k3.metric("Critical Ports",     critical_n,  delta=f"{high_n} high risk")
-k4.metric("Active Alerts",      alert_count)
-k5.metric("BDI",                bdi.get("value", "N/A"), delta=f"{bdi.get('change_pct_1d') or 0:.1f}% today")
+# ── Spotlight: one key signal per dimension ───────────────────────────
+st.markdown('<div style="color:#e8eaed;font-size:16px;font-weight:700;margin-bottom:12px;">🔎 Current Highlights</div>', unsafe_allow_html=True)
+
+top_port    = df_cong.iloc[0] if not df_cong.empty else None
+country_scores: dict = {}
+for port in ports:
+    c = cong_map.get(port["name"], {})
+    sc = c.get("score", 0)
+    if port["country"] not in country_scores or sc > country_scores[port["country"]]["score"]:
+        country_scores[port["country"]] = {"score": sc, "port": port["name"]}
+top_country = max(country_scores.items(), key=lambda x: x[1]["score"]) if country_scores else None
+
+spotlight_items = []
+if top_port is not None:
+    lc = {"Clear":"#4caf50","Moderate":"#ffb74d","High":"#ef5350","Critical":"#b71c1c"}.get(str(top_port.get("label","")),"#a0aab4")
+    spotlight_items.append(("📊 Most Congested Port Right Now",
+        f"<b style='color:{lc}'>{top_port['name']}</b> is at {int(top_port['score'])}/100 "
+        f"({top_port['label']}). Vessels waiting to berth are contributing to longer loading times.",
+        "→ See full rankings in Port Congestion", lc))
+if top_country:
+    country, data = top_country
+    lc2 = "#b71c1c" if data["score"] >= 86 else "#ef5350" if data["score"] >= 61 else "#ffb74d"
+    spotlight_items.append(("⚠️ Highest Supplier Region Exposure",
+        f"<b style='color:{lc2}'>{country}</b> — export port {data['port']} scoring "
+        f"{data['score']}/100. Suppliers in this country face elevated shipment risk.",
+        "→ Full country breakdown in Supplier Risk", lc2))
+bdi_c = "#ef5350" if bdi.get("trend") == "rising" else "#4caf50"
+spotlight_items.append(("📈 Freight Cost Pressure",
+    f"Baltic Dry Index at <b style='color:{bdi_c}'>{bdi.get('value','N/A')}</b>, "
+    f"{bdi.get('trend','N/A')} trend ({bdi_chg:+.1f}% today). "
+    f"{'Rising BDI adds 0.5 days to average route delay estimates.' if bdi.get('trend')=='rising' else 'Stable BDI — no freight cost premium on delay estimates.'}",
+    "→ Route delay estimates in Delay Forecast", bdi_c))
+spotlight_items.append(("🚨 Active Disruption Alerts",
+    f"<b style='color:#ef5350'>{alert_count} active alerts</b> with an estimated "
+    f"<b style='color:#ef5350'>${alert_cost:.0f}M</b> total cost exposure across affected supply lanes.",
+    "→ Full alert feed and recommendations in Risk Alerts", "#ef5350"))
+
+hl_cols = st.columns(2)
+for i, (title, body, link, accent) in enumerate(spotlight_items):
+    hl_cols[i % 2].markdown(
+        f'<div style="background:#1a1f2e;border:1px solid #263044;border-left:3px solid {accent};'
+        f'border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:10px;height:120px;'
+        f'display:flex;flex-direction:column;justify-content:space-between;">'
+        f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{title}</div>'
+        f'<div style="color:#a0aab4;font-size:13px;line-height:1.5">{body}</div>'
+        f'<div style="color:#00d4ff;font-size:12px">{link}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
