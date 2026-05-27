@@ -2,3 +2,7 @@
 notes/
 .env
 db/cache.db
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
