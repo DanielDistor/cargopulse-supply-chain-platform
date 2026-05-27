@@ -1,7 +1,5 @@
 import json
 import os
-import hashlib
-import datetime
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -10,6 +8,7 @@ from services import aisstream, congestion as cong_svc
 from services.shipping_rates import get_bdi
 from db import cache
 from components.styles import inject_global_css
+
 
 load_dotenv()
 
@@ -142,8 +141,6 @@ with cards_col:
             if port["country"] not in country_scores or sc > country_scores[port["country"]]["score"]:
                 country_scores[port["country"]] = {"score": sc, "port": port["name"]}
     top_country = max(country_scores.items(), key=lambda x: x[1]["score"]) if country_scores else None
-
-    def _h(s): return int(hashlib.md5(s.encode()).hexdigest(), 16)
 
     # Alert count from congestion threshold
     alert_count = int((df_cong["score"] >= 60).sum()) + (1 if bdi.get("trend") == "rising" else 0)
