@@ -87,7 +87,7 @@ with st.sidebar:
 c1, c2, c3 = st.columns(3)
 c1.metric("Countries monitored", len(df))
 c2.metric("HIGH or CRITICAL", int((df["score"] > 50).sum()))
-c3.metric("BDI trend", bdi.get("trend", "N/A").upper(), delta=f"{bdi.get('change_pct_1d', 0):.1f}% today")
+c3.metric("BDI trend", bdi.get("trend", "N/A").upper(), delta=f"{bdi.get('change_pct_1d') or 0:.1f}% today")
 
 st.divider()
 
@@ -126,6 +126,6 @@ if selected_country:
     r3.metric("Nearest Key Port", row["worst_port"])
     st.info(
         f"**Drivers:** Port congestion at {row['worst_port']} = {row['congestion_score']}/100 (60% weight) · "
-        f"Wave height = {row['wave_height_m'] or 'N/A'} m (30% weight) · "
+        f"Wave height = {row['wave_height_m'] if row['wave_height_m'] is not None else 'N/A'} m (30% weight) · "
         f"BDI trend = {row['bdi_trend']} (10% weight)"
     )

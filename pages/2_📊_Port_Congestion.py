@@ -31,6 +31,10 @@ with st.spinner("Scoring ports..."):
 df = pd.DataFrame(congestion_data)
 df = df[df["region"].isin(selected_regions)].head(top_n)
 
+if df.empty:
+    st.warning("No ports match the selected regions. Please select at least one region.")
+    st.stop()
+
 # KPI summary row
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Ports scored", len(df))
@@ -64,8 +68,10 @@ st.divider()
 st.subheader("7-Day Congestion Trend")
 trend_port = st.selectbox("Select port for trend view", df["name"].tolist(), key="trend_select")
 if trend_port:
-    import random, datetime
-    random.seed(hash(trend_port))  # deterministic per port name
+    import random, datetime, hashlib
+    # Use hashlib for a stable seed that doesn't change between Python processes
+    seed = int(hashlib.md5(trend_port.encode()).hexdigest(), 16) % (2**32)
+    random.seed(seed)
     row = df[df["name"] == trend_port].iloc[0]
     current_score = row["score"]
     days = [(datetime.date.today() - datetime.timedelta(days=i)).strftime("%b %d") for i in range(6, -1, -1)]
@@ -92,7 +98,7 @@ if selected_port:
     c1, c2, c3 = st.columns(3)
     c1.metric("Congestion Score", row["score"], delta=row["label"])
     c2.metric("Vessels Nearby", row["vessel_count"])
-    c3.metric("Wave Height", f"{row['wave_height_m'] or 'N/A'} m")
+    c3.metric("Wave Height", f"{row['wave_height_m'] if row['wave_height_m'] is not None else 'N/A'} m")
     st.info(
         f"**Score breakdown:** {row['vessel_count']} vessels ÷ {row['capacity_baseline']} baseline "
         f"= {row['vessel_count']/row['capacity_baseline']*100:.0f}% capacity, "

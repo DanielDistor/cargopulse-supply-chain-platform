@@ -100,5 +100,5 @@ if st.button("🔍 Calculate delay forecast", type="primary"):
         with st.expander("📊 Factor details"):
             st.write(f"**Origin congestion score:** {origin_score}/100 ({origin_data.get('label','N/A')})")
             st.write(f"**Destination congestion score:** {dest_score}/100 ({dest_data.get('label','N/A')})")
-            st.write(f"**Wave height at origin:** {wave_h or 'N/A'} m")
+            st.write(f"**Wave height at origin:** {wave_h if wave_h is not None else 'N/A'} m")
             st.write(f"**Baltic Dry Index:** {bdi.get('value','N/A')} (trend: {bdi.get('trend','N/A')})")
