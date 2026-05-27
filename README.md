@@ -43,7 +43,7 @@ git clone https://github.com/DanielDistor/cargopulse-supply-chain-platform
 cd cargopulse-supply-chain-platform
 pip install -r requirements.txt
 cp .env.example .env          # then add your AISSTREAM_API_KEY
-streamlit run '🏠_Home.py'
+streamlit run Home.py
 ```
 
 ## Running Tests
