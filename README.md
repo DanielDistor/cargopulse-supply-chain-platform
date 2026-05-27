@@ -10,6 +10,7 @@
 
 | Page | Description |
 |---|---|
+| 🏠 Home | Global KPIs, live mini-map, top congested ports at a glance |
 | 🗺️ Vessel Map | Live vessel positions near 50 major ports via AISstream WebSocket |
 | 📊 Port Congestion | Congestion score (0–100) for top 30 ports, updated every 15 min |
 | ⏱️ Delay Forecast | Rule-based delay estimate for any origin→destination route |
@@ -42,7 +43,7 @@ git clone https://github.com/DanielDistor/cargopulse-supply-chain-platform
 cd cargopulse-supply-chain-platform
 pip install -r requirements.txt
 cp .env.example .env          # then add your AISSTREAM_API_KEY
-streamlit run app.py
+streamlit run '🏠_Home.py'
 ```
 
 ## Running Tests
