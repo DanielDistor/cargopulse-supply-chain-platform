@@ -7,33 +7,18 @@ def inject_global_css() -> None:
         <style>
         /* ── Page chrome ── */
         .stApp { background-color: #0f1117; }
-        header[data-testid="stHeader"] { background-color: #0f1117; border-bottom: 1px solid #1e2736; }
+        header[data-testid="stHeader"] { background-color: #0f1117; border-bottom: none; }
+        .block-container { padding-top: 0 !important; padding-bottom: 3rem !important; }
 
         /* ── Hide sidebar and its toggle button entirely ── */
         [data-testid="stSidebar"]       { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebarContent"] { display: none !important; }
 
-        /* ── Top-nav page links ── */
-        [data-testid="stPageLink"] { margin: 0 !important; padding: 0 !important; }
-        [data-testid="stPageLink"] a,
-        [data-testid="stPageLink"] a:visited {
-            color: #6b7fa3 !important;
-            text-decoration: none !important;
-            font-size: 13px !important;
-            font-weight: 500 !important;
-            padding: 6px 10px !important;
-            border-radius: 6px !important;
-            white-space: nowrap !important;
-            display: block !important;
-        }
-        [data-testid="stPageLink"] a:hover {
+        /* ── Custom navbar link hover ── */
+        .cp-nav-link:hover {
             color: #e8eaed !important;
-            background: #1e2736 !important;
-        }
-        [data-testid="stPageLink"] a[aria-current="page"] {
-            color: #00d4ff !important;
-            font-weight: 600 !important;
+            background: rgba(255,255,255,0.07) !important;
         }
 
         /* ── Sidebar ── */
@@ -152,25 +137,54 @@ def inject_global_css() -> None:
     )
 
 
-def navbar() -> None:
-    """Top navigation bar — brand on the left, page links on the right."""
-    brand_col, n1, n2, n3, n4, n5, n6 = st.columns([2.2, 0.9, 1.5, 1.5, 1.4, 1.4, 1.2])
-    with brand_col:
-        st.markdown(
-            '<div style="display:flex;align-items:center;height:36px;">'
-            '<span style="color:#e8eaed;font-size:18px;font-weight:800;'
-            'letter-spacing:-0.01em">CargoPulse</span>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with n1: st.page_link("Home.py",                    label="Dashboard")
-    with n2: st.page_link("pages/1_Vessel_Tracking.py", label="Vessel Tracking")
-    with n3: st.page_link("pages/2_Port_Congestion.py", label="Port Congestion")
-    with n4: st.page_link("pages/3_Delay_Forecast.py",  label="Delay Forecast")
-    with n5: st.page_link("pages/4_Supplier_Risk.py",   label="Supplier Risk")
-    with n6: st.page_link("pages/5_Risk_Alerts.py",     label="Risk Alerts")
+def navbar(current: str = "") -> None:
+    """Full-width dark navigation bar. Pass current= the label of the active page."""
+    _pages = [
+        ("Dashboard",        "/"),
+        ("Vessel Tracking",  "/Vessel_Tracking"),
+        ("Port Congestion",  "/Port_Congestion"),
+        ("Delay Forecast",   "/Delay_Forecast"),
+        ("Supplier Risk",    "/Supplier_Risk"),
+        ("Risk Alerts",      "/Risk_Alerts"),
+    ]
+
+    links = ""
+    for label, path in _pages:
+        if label == current:
+            links += (
+                f'<a href="{path}" style="'
+                f'background:#00d4ff;color:#0f1117;'
+                f'padding:6px 14px;border-radius:6px;'
+                f'font-size:13px;font-weight:700;'
+                f'text-decoration:none;white-space:nowrap;">'
+                f'{label}</a>'
+            )
+        else:
+            links += (
+                f'<a href="{path}" class="cp-nav-link" style="'
+                f'color:#8899a6;padding:6px 10px;border-radius:6px;'
+                f'font-size:13px;font-weight:500;'
+                f'text-decoration:none;white-space:nowrap;">'
+                f'{label}</a>'
+            )
+
     st.markdown(
-        '<hr style="margin:4px 0 20px 0;border:none;border-top:1px solid #1e2736;">',
+        f"""
+        <div style="
+            width:100vw;position:relative;left:50%;transform:translateX(-50%);
+            background:#0d1822;border-bottom:1px solid #1e2736;
+            padding:0 2rem;height:54px;
+            display:flex;align-items:center;justify-content:space-between;
+            box-sizing:border-box;margin-bottom:1.5rem;
+        ">
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                <span style="font-size:22px">⚓</span>
+                <span style="color:#e8eaed;font-size:17px;font-weight:800;
+                             letter-spacing:-0.01em;">CargoPulse</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">{links}</div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
@@ -179,9 +193,9 @@ def page_header(title: str, subtitle: str) -> None:
     """Render a styled page header."""
     st.markdown(
         f"""
-        <div style="margin-bottom: 8px;">
-            <h1 style="margin:0; padding:0; color:#e8eaed; font-size:2rem; font-weight:800;">{title}</h1>
-            <p style="margin:4px 0 0 0; color:#5a6a7e; font-size:14px;">{subtitle}</p>
+        <div style="margin-bottom:8px;">
+            <h1 style="margin:0;padding:0;color:#e8eaed;font-size:2rem;font-weight:800;">{title}</h1>
+            <p style="margin:4px 0 0 0;color:#5a6a7e;font-size:14px;">{subtitle}</p>
         </div>
         """,
         unsafe_allow_html=True,

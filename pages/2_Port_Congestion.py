@@ -15,7 +15,7 @@ load_dotenv()
 
 st.set_page_config(page_title="Port Congestion | CargoPulse", layout="wide")
 inject_global_css()
-navbar()
+navbar(current="Port Congestion")
 page_header(
     "Port Congestion Rankings",
     "Real-time congestion scoring for 50 major world ports. Score = vessel density × marine weather penalty."

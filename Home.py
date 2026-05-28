@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 inject_global_css()
-navbar()
+navbar(current="Dashboard")
 
 PORTS_PATH = os.path.join(os.path.dirname(__file__), "db", "ports.json")
 with open(PORTS_PATH) as f:

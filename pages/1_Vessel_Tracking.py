@@ -14,7 +14,7 @@ load_dotenv()
 
 st.set_page_config(page_title="Vessel Tracking | CargoPulse", layout="wide")
 inject_global_css()
-navbar()
+navbar(current="Vessel Tracking")
 page_header(
     "Live Vessel Tracking",
     "Vessel positions within ~50 nautical miles of major ports via terrestrial AIS. Color = movement status."
