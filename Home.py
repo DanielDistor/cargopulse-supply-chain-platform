@@ -135,12 +135,16 @@ st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 # cannot reliably override internal stacking contexts and intermediate padding.
 
 LC    = {"Clear": "#22c55e", "Moderate": "#f59e0b", "High": "#ef4444", "Critical": "#dc2626"}
-GAP   = "10px"
 PANEL = (
     'background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
-    f'padding:16px;display:flex;flex-direction:column;gap:{GAP};'
+    'padding:16px;display:flex;flex-direction:column;gap:10px;'
 )
-TITLE = 'color:#1e293b;font-size:15px;font-weight:700;'
+# Ports panel uses tighter padding + gap so 3 compact cards fit comfortably
+PORTS_PANEL = (
+    'background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
+    'padding:12px 14px;display:flex;flex-direction:column;gap:6px;'
+)
+TITLE = 'color:#1e293b;font-size:15px;font-weight:700;margin-bottom:2px;'
 
 # ── Build Plotly figure ─────────────────────────────────────────────────
 SECTION_H = 620   # section height; map fills left card, right panels fill right col
@@ -151,6 +155,15 @@ if not df_cong.empty:
         sub = df_cong[df_cong["label"] == label]
         if sub.empty:
             continue
+        # Legend-only phantom trace — fixed size so all dots look equal in the legend
+        fig.add_trace(go.Scattergeo(
+            lat=[None], lon=[None],
+            mode="markers",
+            name=label,
+            marker=dict(size=10, color=color, opacity=0.85),
+            showlegend=True,
+        ))
+        # Real data trace — score-sized markers, no legend entry
         fig.add_trace(go.Scattergeo(
             lat=sub["lat"].tolist(),
             lon=sub["lon"].tolist(),
@@ -162,7 +175,7 @@ if not df_cong.empty:
                 opacity=0.85,
                 line=dict(width=0),
             ),
-            showlegend=True,
+            showlegend=False,
             hovertext=sub.apply(
                 lambda r: f"<b>{r['name']}</b><br>Score: {r['score']}/100 — {r['label']}<br>Vessels: {r['vessel_count']}",
                 axis=1,
@@ -172,20 +185,30 @@ if not df_cong.empty:
 fig.update_layout(
     geo=dict(
         projection_type="natural earth",
+        projection_scale=1.0,
+        center=dict(lon=10, lat=15),
         showland=True,      landcolor="#dde8ef",
         showocean=True,     oceancolor="#ffffff",
         showlakes=False,
         showcountries=True, countrycolor="#94a3b8",
         showframe=False,    bgcolor="#ffffff",
+        lataxis=dict(range=[-60, 80]),
+        lonaxis=dict(range=[-170, 190]),
     ),
     paper_bgcolor="#ffffff",
-    margin=dict(l=0, r=0, t=30, b=0),
+    margin=dict(l=0, r=0, t=40, b=0),
     height=SECTION_H,
-    title=dict(text="Port Congestion Map", font=dict(color="#64748b", size=12), x=0),
+    title=dict(
+        text="<b>Port Congestion Map</b>",
+        font=dict(color="#1e293b", size=14, family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"),
+        x=0.01, xanchor="left",
+        y=0.98, yanchor="top",
+    ),
     legend=dict(
         bgcolor="#ffffff", bordercolor="#e2e8f0",
         font=dict(color="#64748b", size=11),
         orientation="h", yanchor="bottom", y=0.01, xanchor="left", x=0.0,
+        itemsizing="constant",   # force equal icon size regardless of marker data
     ),
 )
 
@@ -199,28 +222,44 @@ chart_html = pio.to_html(
 
 # ── Build right-panel HTML ──────────────────────────────────────────────
 port_html = ""
-for _, row in df_cong.head(2).iterrows():
+for _, row in df_cong.head(3).iterrows():
     lc = LC.get(row.get("label", ""), "#64748b")
     port_html += (
-        f'<div style="background:#f8fafc;border-radius:10px;padding:14px 16px;'
-        f'display:flex;align-items:center;border-left:3px solid {lc};">'
+        f'<div style="background:#f8fafc;border-radius:8px;padding:8px 12px;'
+        f'display:flex;align-items:center;">'
         f'<div style="flex:1;min-width:0;">'
-        f'<div style="color:#1e293b;font-size:14px;font-weight:600;'
+        f'<div style="color:#1e293b;font-size:13px;font-weight:600;'
         f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-        f'<div style="color:#94a3b8;font-size:12px;margin-top:4px">'
+        f'<div style="color:#94a3b8;font-size:11px;margin-top:2px">'
         f'{row["country"]} · {row["vessel_count"]} vessels</div>'
         f'</div>'
-        f'<div style="flex-shrink:0;margin-left:12px;">'
-        f'<span style="color:{lc};font-size:22px;font-weight:800">{row["score"]}</span>'
-        f'<span style="color:#94a3b8;font-size:11px"> /100</span>'
+        f'<div style="flex-shrink:0;margin-left:10px;">'
+        f'<span style="color:#1e293b;font-size:19px;font-weight:800">{row["score"]}</span>'
+        f'<span style="color:#94a3b8;font-size:10px"> /100</span>'
         f'</div>'
         f'</div>'
     )
 if not port_html:
     port_html = (
-        '<div style="background:#f8fafc;border-radius:10px;padding:14px 16px;'
+        '<div style="background:#f8fafc;border-radius:8px;padding:8px 12px;'
         'color:#94a3b8;font-size:13px">No congestion data yet</div>'
     )
+
+def _alert_card(bg: str, col: str, title: str, body: str, timestamp: str = "Just now") -> str:
+    return (
+        f'<div style="background:{bg};border-radius:10px;padding:12px 14px;">'
+        f'<div style="color:{col};font-size:13px;font-weight:700">{title}</div>'
+        f'<div style="color:#475569;font-size:12px;margin-top:3px">{body}</div>'
+        f'<div style="color:#94a3b8;font-size:11px;margin-top:3px">{timestamp}</div>'
+        f'</div>'
+    )
+
+# Cycling palette for news cards so consecutive items look distinct
+_NEWS_PALETTE = [
+    ("#eff6ff", "#3b82f6"),   # blue
+    ("#f5f3ff", "#7c3aed"),   # violet
+    ("#ecfeff", "#0891b2"),   # cyan
+]
 
 alert_html = ""
 n_cards = 0
@@ -232,50 +271,40 @@ for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
     col     = "#ef4444" if is_crit else "#f59e0b"
     bg      = "#fef2f2" if is_crit else "#fffbeb"
     title   = "Critical Congestion Detected" if is_crit else "High Congestion Alert"
-    alert_html += (
-        f'<div style="background:{bg};border-radius:10px;padding:14px 16px;">'
-        f'<div style="color:{col};font-size:13px;font-weight:700">{title}</div>'
-        f'<div style="color:#475569;font-size:12px;margin-top:4px">'
-        f'{row["name"]} · {row["score"]}/100 · {row["vessel_count"]} vessels</div>'
-        f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Just now</div>'
-        f'</div>'
-    )
+    body    = f'{row["name"]} · {row["score"]}/100 · {row["vessel_count"]} vessels'
+    alert_html += _alert_card(bg, col, title, body)
     n_cards += 1
 
 if bdi.get("trend") == "rising" and n_cards < 3:
-    alert_html += (
-        f'<div style="background:#fffbeb;border-radius:10px;padding:14px 16px;">'
-        f'<div style="color:#f59e0b;font-size:13px;font-weight:700">Freight Rate Rising</div>'
-        f'<div style="color:#475569;font-size:12px;margin-top:4px">'
-        f'BDI index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
-        f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Just now</div>'
-        f'</div>'
-    )
+    body = f'BDI index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today'
+    alert_html += _alert_card("#fffbeb", "#f59e0b", "Freight Rate Rising", body)
     n_cards += 1
 
 for item in news_items[:3 - n_cards]:
     if n_cards >= 3:
         break
-    url_a = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
-    alert_html += (
-        f'<div style="background:#eff6ff;border-radius:10px;padding:14px 16px;">'
-        f'<div style="color:#3b82f6;font-size:13px;font-weight:700">'
-        f'<a {url_a} style="color:#3b82f6;text-decoration:none;'
+    bg, col = _NEWS_PALETTE[n_cards % len(_NEWS_PALETTE)]
+    url_a   = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
+    title_a = (
+        f'<a {url_a} style="color:{col};text-decoration:none;'
         f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">'
-        f'{item["title"]}</a></div>'
-        f'<div style="color:#475569;font-size:12px;margin-top:4px">{item["source"]}</div>'
-        f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Maritime News</div>'
+        f'{item["title"]}</a>'
+    )
+    alert_html += (
+        f'<div style="background:{bg};border-radius:10px;padding:12px 14px;">'
+        f'<div style="color:{col};font-size:13px;font-weight:700">{title_a}</div>'
+        f'<div style="color:#475569;font-size:12px;margin-top:3px">{item["source"]}</div>'
+        f'<div style="color:#94a3b8;font-size:11px;margin-top:3px">Maritime News</div>'
         f'</div>'
     )
     n_cards += 1
 
 if not alert_html:
-    alert_html = (
-        '<div style="background:#f0fdf4;border-radius:10px;padding:14px 16px;">'
-        '<div style="color:#22c55e;font-size:13px;font-weight:700">All Systems Clear</div>'
-        '<div style="color:#475569;font-size:12px;margin-top:4px">No active congestion alerts</div>'
-        '<div style="color:#94a3b8;font-size:11px;margin-top:4px">All ports below threshold</div>'
-        '</div>'
+    alert_html = _alert_card(
+        "#f0fdf4", "#22c55e",
+        "All Systems Clear",
+        "No active congestion alerts",
+        "All ports below threshold",
     )
 
 # ── Render as single iframe — full CSS control, no Streamlit wrappers ──
@@ -324,19 +353,34 @@ html,body{{
     <div class="cp-map">{chart_html}</div>
     <div class="cp-right">
         <div class="cp-right-top">
-            <div style="{PANEL}">
+            <div style="{PORTS_PANEL}">
                 <div style="{TITLE}">📍 Top Congested Ports</div>
                 {port_html}
             </div>
         </div>
         <div class="cp-right-bot">
-            <div style="{PANEL}flex:1;">
+            <div style="{PANEL}flex:1;overflow:hidden;">
                 <div style="{TITLE}">🔔 Live Alerts &amp; News</div>
                 {alert_html}
             </div>
         </div>
     </div>
 </div>
+<script>
+/* Force Plotly to re-measure the container after the iframe finishes painting.
+   Without this, responsive:true may snapshot width=0 and render off-centre. */
+function resizePlot() {{
+    var el = document.querySelector('.js-plotly-plot');
+    if (window.Plotly && el) {{
+        Plotly.Plots.resize(el);
+    }}
+}}
+/* Fire on load and once more after a short delay to catch late CDN load */
+window.addEventListener('load', function() {{
+    resizePlot();
+    setTimeout(resizePlot, 400);
+}});
+</script>
 </body>
 </html>"""
 

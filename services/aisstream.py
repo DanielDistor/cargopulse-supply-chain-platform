@@ -64,7 +64,7 @@ async def _fetch_snapshot(bounding_boxes: list, duration_seconds: int) -> list[d
     return list(vessels.values())
 
 
-def get_vessels(bounding_boxes: list, duration_seconds: int = 5) -> list[dict]:
+def get_vessels(bounding_boxes: list, duration_seconds: int = 3) -> list[dict]:
     """
     Return cached vessel snapshot or fetch a fresh one.
     Falls back to stale cache if API is unreachable.
@@ -83,8 +83,10 @@ def get_vessels(bounding_boxes: list, duration_seconds: int = 5) -> list[dict]:
         )
         loop.close()
 
+    # Always cache — even empty results — so subsequent loads are instant
+    cache.set(VESSEL_CACHE_KEY, {"vessels": vessels})
+
     if vessels:
-        cache.set(VESSEL_CACHE_KEY, {"vessels": vessels})
         return vessels
 
     # API failed — return stale data with whatever we have
