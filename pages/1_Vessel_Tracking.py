@@ -66,59 +66,127 @@ def get_vessel_category(code=None, name: str = "", nav_status=None) -> str:
             if 70 <= c <= 79: return "Cargo"
             if 80 <= c <= 89: return "Tanker"
             if 60 <= c <= 69: return "Passenger"
-            if c in (30, 31, 32): return "Fishing"
+            if c == 30:        return "Fishing"
             if 50 <= c <= 59: return "Special"
+            # Additional AIS codes: towing (21-22, 31-32), dredging (33),
+            # diving (34), military (35), law enforcement (55)
+            if c in (21, 22, 31, 32, 33, 34, 35, 55): return "Special"
         except (ValueError, TypeError):
             pass
 
     nm = (name or "").upper()
 
-    # ── Tanker (check before Cargo — some names contain both) ─────────────
+    # ── Tanker — check before Cargo; some names contain both words ─────────
     _TANKER = [
-        "TANKER", " OIL ", "CRUDE", "LNG", "LPG", " GAS ", "VLCC",
-        "AFRAMAX", "SUEZMAX", "CHEMICAL", "PRODUCT TK", "BITUMEN",
-        "NAPHTHA", "STENA ", "TEEKAY", "FRONTLINE", "TSAKOS", "EURONAV",
-        "HAFNIA", "NORDIC CHEMICAL", "NORDIC TANKER", "NORDIC TK",
-        "DELTA TK", "GULF TK", "COSMO OIL", "BP EAGLE",
-        "SCORPIO TK", "ARDMORE", "DIAMOND S", "GENER8",
+        # vessel type keywords
+        "TANKER", " OIL ", "CRUDE OIL", "CRUDE TK", "CRUDE CARRIER",
+        "LNG ", " LNG", "LPG ", " LPG", "VLCC", "ULCC",
+        "AFRAMAX", "SUEZMAX", "CHEMICAL", "PRODUCT TK", "PRODUCT CARRIER",
+        "BITUMEN", "NAPHTHA", "ASPHALT", "ETHYLENE", "AMMONIA CARRIER",
+        "PETROLEUM", "BUNKER", "SHUTTLE TK", "SHUTTLE TANKER",
+        "FPSO", " FSO ", "ACID CARRIER",
+        # "MT " prefix = Motor Tanker
+        "MT EAGLE", "MT FALCON", "MT CONDOR",
+        # operators / fleets
+        "TEEKAY", "FRONTLINE", "TSAKOS", "EURONAV", "DHT ",
+        "HAFNIA", "ARDMORE", "DIAMOND S", "GENER8", "MINERVA",
+        "NORDIC CHEMICAL", "NORDIC TANKER", "NORDIC TK",
+        "SCORPIO TK", "NAVIGATOR GAS", "NAVIGATOR ", "EXMAR",
+        "STENA BULK", "BW GAS", "BW EPIC", "BW EAGLE",
+        "DELTA TK", "GULF TK", "COSMO OIL", "VELA ", "NITC",
+        "INTERNATIONAL SEAWAYS", "FLEX LNG", "MOL CHEMICAL",
+        "AET TANKER", " AET ", "MARANGAS", "GEOGAS",
+        "DORADO", "OLYMPIC SHIPPING", "OLYMPIC TK",
+        "SVITZER OIL", "PETROBRAS", "SOCAR",
     ]
     if any(k in nm for k in _TANKER): return "Tanker"
 
-    # ── Cargo: container ships, bulk carriers, general cargo ──────────────
+    # ── Cargo: container, bulk, general cargo, RoRo, car carriers ──────────
     _CARGO = [
-        "CONTAINER", "CARGO", "BULK", "FREIGHTER", "CARRIER",
-        "COSCO ", "EVERGREEN", "EVER ", "MAERSK", "MSC ", " MSC",
-        "CMA CGM", "HAPAG", "YANG MING", " ONE ", "OOCL", " APL ",
-        " NYK ", " MOL ", "K LINE", "SEASPAN", "COSTAMARE", "DANAOS",
+        # vessel type keywords
+        "CONTAINER", "CARGO", "BULK", "BULKER", "FREIGHTER", "CARRIER",
+        "RORO", "RO RO", "RO-RO", "ROPAX", "CAR CARRIER", "PCC ",
+        "VEHICLE CARRIER", "AUTO CARRIER", "PCL ", "PCTC",
         "ULTRAMAX", "SUPRAMAX", "HANDYSIZE", "HANDYMAX", "CAPESIZE",
-        "KAMSARMAX", "NEWCASTLEMAX", "PANAMAX", "PACIFIC BASIN",
-        "DIANA SHIPPING", "STAR BULK", "GOLDEN OCEAN", "NAVIOS",
-        "SCORPIO BULK", "BERGE ", "VALE ", " IRON ", " COAL ",
-        "GRAIN ", "CEMENT", "STONE ", "STEEL ", " ORE ",
+        "KAMSARMAX", "NEWCASTLEMAX", "PANAMAX",
+        # commodity keywords
+        " ORE ", " COAL ", "GRAIN ", "CEMENT", "STONE ",
+        "STEEL ", " IRON ", " WOOD ", "LUMBER", "TIMBER",
+        # major container lines
+        "MAERSK", "MSC ", " MSC", "CMA CGM", "HAPAG",
+        "EVERGREEN", "EVER ", "YANG MING", " ONE ", "OOCL",
+        " APL ", " NYK ", " MOL ", "K LINE", "PIL ",
+        "ZIM ", "HMM ", "WAN HAN", "SITC ", "T.S. LINE",
+        "SM LINE", "GOLD STAR LINE", "RCL ", "KMTC ",
+        "ANTONG", "SINOLINES", "COSCO ",
+        # bulk / general cargo operators
+        "SEASPAN", "COSTAMARE", "DANAOS", "DIANA SHIPPING",
+        "STAR BULK", "GOLDEN OCEAN", "NAVIOS", "PACIFIC BASIN",
+        "EAGLE BULK", "GRINDROD", "OLDENDORFF", "SWIRE ",
+        "SCORPIO BULK", "BERGE ", "VALE ", "GREAT WALL",
+        "ATLAS BULK", "GLOBUS ", "GENCO ", "SAFE BULKERS",
+        # RoRo / car carrier operators
+        "GLOVIS", "EUKOR", "WILHELMSEN", "WALLENIUS", "HOEGH",
+        "HÖEGH", "K-LINE CAR", "NYK CAR", "MOL ACE",
+        "ATLANTIC RORO", "LIBERTY ", "LODESTAR",
     ]
     if any(k in nm for k in _CARGO): return "Cargo"
 
     # ── Passenger ─────────────────────────────────────────────────────────
     _PASS = [
-        "FERRY", "PASSENGER", "CRUISE", "LINER",
+        # generic
+        "FERRY", "PASSENGER", "CRUISE", "LINER", "ROPAX",
+        # cruise lines
         "CELEBRITY", "CARNIVAL", "ROYAL CARIBBEAN", "COSTA ",
         "PRINCESS", "QUEEN ", "EMPRESS", "VIKING ",
         "PONANT", "SILVERSEA", "SEABOURN", "AZAMARA",
         "CUNARD", "OCEANIA", "REGENT ", "WINDSTAR",
-        " FERRY", "FJORD", "HURTIGRUTEN",
+        "NORWEGIAN CRUISE", " NCL ", "HURTIGRUTEN",
+        "AURORA ", "DREAM ", "MARELLA",
+        "SWAN HELLENIC", "SAGA CRUISES", "SCENIC ",
+        # ferry operators / routes
+        "DFDS", "COLOR LINE", "FJORDLINE", "STENA LINE",
+        " FJORD", "IRISH FERRIES", "BRITTANY", "P&O FERRY",
+        "WASA ", "TALLINK", "SILJA", "VIKING LINE",
+        "CORSICA", "LA MERIDIONALE", "TTT LINE",
     ]
     if any(k in nm for k in _PASS): return "Passenger"
 
-    # ── Fishing ──────────────────────────────────────────────────────────
-    _FISH = ["FISH", "TRAWL", "PURSE", "SEINER", "LONGLINER"]
+    # ── Fishing ────────────────────────────────────────────────────────────
+    _FISH = [
+        "FISH", "TRAWL", "PURSE", "SEINER", "LONGLINER",
+        "FISHERMAN", "SQUID", "CATCHER", "ANGLER",
+        "HERRING", "TUNA ", "MACKEREL",
+    ]
     if any(k in nm for k in _FISH): return "Fishing"
 
-    # ── Special / service vessels ─────────────────────────────────────────
+    # ── Special / service vessels ──────────────────────────────────────────
     _SPEC = [
-        "TUG ", " TUG", "PILOT", "DREDG", "CRANE VESSEL",
+        # tug / workboat
+        "TUG ", " TUG", "TUGBOAT", "SVITZER", "KOTUG", "SMIT ",
+        # pilot / port
+        "PILOT", "PORT ", " PORT", "HARBOUR", "HARBOR",
+        # dredging
+        "DREDG", "CUTTER SUCTION", "TRAILING SUCTION", "HOPPER",
+        # offshore / supply
         "OFFSHORE", " PSV", " AHTS", "ANCHOR HANDLING",
-        "PLATFORM", "ICEBREAKER", "SURVEY", "RESEARCH",
-        "COASTGUARD", "COAST GUARD", "NAVAL", "WARSHIP",
+        "SUPPLY VESSEL", " CSV", "MULTI PURPOSE VESSEL",
+        "DIVE SUPPORT", "ROV SUPPORT", "PLATFORM SUPPLY",
+        # cable / survey / research
+        "CABLE ", "CABLE SHIP", "CABLE LAYER",
+        "SURVEY", "RESEARCH", "OCEANOGRAPH",
+        "BUOY TENDER", "LIGHTHOUSE",
+        # crane / heavy lift
+        "CRANE VESSEL", "HEAVY LIFT", "THIALF", "SLEIPNIR",
+        # emergency / safety
+        "ICEBREAKER", "ICE BREAKER", "RESCUE", "FIREBOAAT", "FIREBOAT",
+        "COASTGUARD", "COAST GUARD", "SAR ", "PATROL",
+        # military
+        "NAVAL", "WARSHIP", "HMS ", "USS ", "USCGC",
+        # platform / barge
+        "PLATFORM", " BARGE", "PONTOON", "FPSO",
+        # other service
+        "WATER BOAT", "BUNKER BARGE", "OIL SPILL",
     ]
     if any(k in nm for k in _SPEC): return "Special"
 
