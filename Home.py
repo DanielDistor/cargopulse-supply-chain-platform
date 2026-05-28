@@ -162,10 +162,10 @@ with map_col:
         geo=dict(
             projection_type="natural earth",
             showland=True,      landcolor="#dde8ef",
-            showocean=True,     oceancolor="#bfdbfe",
+            showocean=True,     oceancolor="#ffffff",
             showlakes=False,
             showcountries=True, countrycolor="#94a3b8",
-            showframe=False,    bgcolor="#f1f5f9",
+            showframe=False,    bgcolor="#ffffff",
         ),
         paper_bgcolor="#ffffff",
         margin=dict(l=0, r=0, t=30, b=0),
