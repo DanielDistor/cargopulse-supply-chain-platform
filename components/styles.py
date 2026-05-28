@@ -5,112 +5,129 @@ def inject_global_css() -> None:
     st.markdown(
         """
         <style>
-        /* ─────────────────────────────────────────────────────────────────
-           SOURCE TOKENS: josna-14/Maritime_Vessel_Tracking
-           index.css + Navbar.css + Dashboard.js inline styles
-        ───────────────────────────────────────────────────────────────── */
-
-        /* index.css :root / body — exact */
-        .stApp {
-            background: #f4f7fa;
-            font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-            color: #0f1c2e;
-        }
+        /* ── Page chrome ── */
+        .stApp { background-color: #0f1117; }
         header[data-testid="stHeader"] { display: none !important; }
+        .block-container { padding-top: 0.25rem !important; padding-bottom: 1rem !important; }
 
-        /* .app-container { padding: 2rem clamp(1rem, 5vw, 3rem) }
-           We use 1.25rem sides to match the tighter end of clamp.
-           Top: 0 (navbar provides its own margin-bottom). */
-        .block-container {
-            padding-top: 0 !important;
-            padding-bottom: 1.25rem !important;
-            padding-left: 1.25rem !important;
-            padding-right: 1.25rem !important;
-            max-width: 100% !important;
-        }
+        /* ── Compact element spacing ── */
+        [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
+        [data-testid="stHorizontalBlock"] { gap: 0.75rem !important; }
 
-        /* ── CRITICAL: gap must be 0 so HTML margin-bottom is the
-           sole spacing authority — matching reference exactly.
-           Reference: .page { gap: 1.5rem } — but Dashboard.js ALSO
-           sets marginBottom:"25px" on each section. In flex, those
-           add: 24px gap + 25px margin = 49px. We eliminate the gap
-           so only the 25px HTML margin applies. ── */
-        [data-testid="stVerticalBlock"] { gap: 0 !important; }
-
-        /* Remove Streamlit element wrapper spacing */
-        [data-testid="element-container"] {
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-        }
-
-        /* Kill column and markdown container spacing */
-        [data-testid="column"] {
-            padding: 0 !important;
-            min-width: 0 !important;
-        }
-        .stMarkdownContainer {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        /* Dashboard.js main split: gap "25px" = 1.5625rem — exact */
-        [data-testid="stHorizontalBlock"] { gap: 1.5625rem !important; }
-
-        /* Hide sidebar */
+        /* ── Hide sidebar ── */
         [data-testid="stSidebar"]       { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebarContent"] { display: none !important; }
 
-        /* Navbar.css .navbar__links a.active / a:hover
-           background: rgba(255,255,255,0.2) — exact */
+        /* ── Navbar link hover ── */
         .cp-nav-link:hover {
-            background: rgba(255, 255, 255, 0.2) !important;
+            color: #e8eaed !important;
+            background: rgba(255,255,255,0.07) !important;
         }
 
-        /* Map panel: paper_bgcolor="#0f2340" fills the chart area.
-           The CSS background shows only in the 44px title strip at top.
-           Dashboard.js section: borderRadius "12px", shadow exact. */
+        /* ── KPI metric cards ── */
+        [data-testid="stMetric"] {
+            background: linear-gradient(135deg, #1a1f2e 0%, #16202f 100%);
+            border: 1px solid #263044;
+            border-radius: 12px;
+            padding: 20px 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        [data-testid="stMetricLabel"] { color: #6b7fa3 !important; font-size: 12px !important; text-transform: uppercase; letter-spacing: 0.08em; }
+        [data-testid="stMetricValue"] { color: #e8eaed !important; font-size: 28px !important; font-weight: 700 !important; }
+        [data-testid="stMetricDelta"] svg { display: none; }
+
+        /* ── Plotly chart containers ── */
         [data-testid="stPlotlyChart"] {
-            background: white;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border: 1px solid #1e2736;
         }
 
-        /* Dataframes */
+        /* ── Dataframes ── */
         [data-testid="stDataFrame"] {
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border: 1px solid #1e2736;
         }
 
-        hr { border-color: #eee !important; margin: 1.5rem 0; }
+        /* ── Dividers ── */
+        hr { border-color: #1e2736 !important; margin: 1.5rem 0; }
 
-        /* index.css .page__header h1: color #0f1c2e
-           Dashboard.js h1 inline: color "#1f3c88" — inline wins */
-        h1 { color: #1f3c88 !important; font-weight: 700; }
-        h2, h3 { color: #333 !important; font-weight: 600; }
+        /* ── Page titles ── */
+        h1 { color: #e8eaed !important; font-weight: 800; letter-spacing: -0.02em; }
+        h2 { color: #c9d1da !important; font-weight: 700; }
+        h3 { color: #a0aab4 !important; font-weight: 600; }
 
-        /* index.css .card__label: color #687590 */
+        /* ── Caption ── */
         .stCaption, [data-testid="stCaptionContainer"] p {
-            color: #687590 !important;
-            font-size: 0.85rem !important;
+            color: #5a6a7e !important;
+            font-size: 13px !important;
         }
 
-        /* Spinner */
-        .stSpinner > div { border-top-color: #1f3c88 !important; }
+        /* ── Buttons ── */
+        .stButton button {
+            background: linear-gradient(135deg, #0099cc 0%, #00d4ff 100%);
+            color: #0f1117;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: all 0.2s ease;
+        }
+        .stButton button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.3);
+        }
 
-        /* Selectbox */
+        /* ── Spinner ── */
+        .stSpinner > div { border-top-color: #00d4ff !important; }
+
+        /* ── Info boxes ── */
+        [data-testid="stInfo"] {
+            background-color: #0d2035 !important;
+            border: 1px solid #0099cc !important;
+            border-radius: 10px !important;
+            color: #a0cfea !important;
+        }
+
+        /* ── Warning boxes ── */
+        [data-testid="stWarning"] {
+            background-color: #1e1500 !important;
+            border: 1px solid #b8860b !important;
+            border-radius: 10px !important;
+        }
+
+        /* ── Expander ── */
+        [data-testid="stExpander"] {
+            border: 1px solid #1e2736 !important;
+            border-radius: 10px !important;
+            background-color: #1a1f2e !important;
+        }
+
+        /* ── Selectbox / Multiselect ── */
         [data-testid="stSelectbox"] > div,
         [data-testid="stMultiSelect"] > div {
-            background-color: white;
-            border-color: #cbd5ef;
-            border-radius: 10px;
+            background-color: #1a1f2e;
+            border-color: #263044;
+            border-radius: 8px;
         }
 
-        /* index.css progress: linear-gradient(90deg, #1e3c72, #2a5298) */
-        [data-testid="stSlider"] [class*="thumb"] { background-color: #1e3c72 !important; }
-        [data-testid="stSlider"] [class*="track"]  { background-color: #2a5298 !important; }
+        /* ── Multiselect pills ── */
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] {
+            background-color: #1e2736 !important;
+            border: 1px solid #374357 !important;
+        }
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] span {
+            color: #a0aab4 !important;
+        }
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] [role="button"] {
+            color: #6b7fa3 !important;
+        }
+
+        /* ── Slider ── */
+        [data-testid="stSlider"] [class*="thumb"] { background-color: #00d4ff !important; }
+        [data-testid="stSlider"] [class*="track"]  { background-color: #00d4ff !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -118,17 +135,7 @@ def inject_global_css() -> None:
 
 
 def navbar(current: str = "") -> None:
-    """
-    Navbar.css exact values:
-      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)
-      padding: 1rem 2rem
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15)
-      brand: 1.4rem / 700, logo: 2rem
-      links gap: 1.25rem
-      link: color #fff, font-weight 500, padding 0.4rem 0.6rem, border-radius 6px
-      active: background rgba(255,255,255,0.2)
-    margin-bottom matches .page gap (1.5rem) so first section starts correctly.
-    """
+    """Full-width dark navigation bar."""
     _pages = [
         ("Dashboard",        "/"),
         ("Vessel Tracking",  "/Vessel_Tracking"),
@@ -140,31 +147,39 @@ def navbar(current: str = "") -> None:
 
     links = ""
     for label, path in _pages:
-        active = label == current
-        bg = "background:rgba(255,255,255,0.2);" if active else ""
-        links += (
-            f'<a href="{path}" target="_self" class="{"" if active else "cp-nav-link"}" style="'
-            f'color:#fff;text-decoration:none;font-weight:500;'
-            f'padding:0.4rem 0.6rem;border-radius:6px;{bg}white-space:nowrap;">'
-            f'{label}</a>'
-        )
+        if label == current:
+            links += (
+                f'<a href="{path}" target="_self" style="'
+                f'background:#00d4ff;color:#0f1117;'
+                f'padding:6px 14px;border-radius:6px;'
+                f'font-size:13px;font-weight:700;'
+                f'text-decoration:none;white-space:nowrap;">'
+                f'{label}</a>'
+            )
+        else:
+            links += (
+                f'<a href="{path}" target="_self" class="cp-nav-link" style="'
+                f'color:#8899a6;padding:6px 10px;border-radius:6px;'
+                f'font-size:13px;font-weight:500;'
+                f'text-decoration:none;white-space:nowrap;">'
+                f'{label}</a>'
+            )
 
     st.markdown(
         f"""
         <div style="
             width:100vw;position:relative;left:50%;transform:translateX(-50%);
-            background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);
-            box-shadow:0 4px 12px rgba(0,0,0,0.15);
-            padding:1rem 2rem;
+            background:#0d1822;border-bottom:1px solid #1e2736;
+            padding:0 2rem;height:54px;
             display:flex;align-items:center;justify-content:space-between;
-            box-sizing:border-box;
-            margin-bottom:1.5rem;
+            box-sizing:border-box;margin-bottom:1.5rem;
         ">
-            <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
-                <span style="font-size:2rem">⚓</span>
-                <span style="color:#fff;font-size:1.4rem;font-weight:700;">CargoPulse</span>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                <span style="font-size:22px">⚓</span>
+                <span style="color:#e8eaed;font-size:17px;font-weight:800;
+                             letter-spacing:-0.01em;">CargoPulse</span>
             </div>
-            <div style="display:flex;align-items:center;gap:1.25rem;">{links}</div>
+            <div style="display:flex;align-items:center;gap:4px;">{links}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -172,11 +187,13 @@ def navbar(current: str = "") -> None:
 
 
 def page_header(title: str, subtitle: str) -> None:
-    """Dashboard.js: h1 #1f3c88/24px, p #666/14px, marginBottom 25px."""
+    """Render a styled page header."""
     st.markdown(
-        '<div style="margin:0 0 25px 0;">'
-        f'<h1 style="margin:0 0 5px 0;color:#1f3c88;font-size:24px;font-weight:700">{title}</h1>'
-        f'<p style="margin:0;color:#666;font-size:14px">{subtitle}</p>'
-        '</div>',
+        f"""
+        <div style="margin-bottom:8px;">
+            <h1 style="margin:0;padding:0;color:#e8eaed;font-size:2rem;font-weight:800;">{title}</h1>
+            <p style="margin:4px 0 0 0;color:#5a6a7e;font-size:14px;">{subtitle}</p>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
