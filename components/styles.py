@@ -45,15 +45,9 @@ def inject_global_css() -> None:
         [data-testid="stMetricDelta"] svg { display: none; }
 
         /* ── Plotly chart containers ── */
+        /* Border/radius handled at the column level for the map card via Home.py injection */
         [data-testid="stPlotlyChart"] {
-            border-radius: 14px;
             overflow: hidden;
-            border: 1px solid #e2e8f0;
-            background: #ffffff;
-        }
-        [data-testid="stPlotlyChart"] > div,
-        [data-testid="stPlotlyChart"] iframe {
-            border-radius: 14px !important;
         }
 
         /* ── Dataframes ── */

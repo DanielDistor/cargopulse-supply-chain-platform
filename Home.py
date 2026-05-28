@@ -126,6 +126,52 @@ c4.markdown(_kpi("BDI",             bdi_display,                 f"{bdi_chg:+.1f
 # Spacer so KPI row doesn't visually bleed into the panels below
 st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
+# ── Map card CSS — injected before the columns so selectors are live ───
+st.markdown(
+    """
+    <style>
+    /* Target only the row that contains the Plotly chart */
+
+    /* Stretch both columns to the same height so map bottom = right panel bottom */
+    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"]) {
+        align-items: stretch !important;
+    }
+
+    /* Left column IS the card — apply border/radius here, not on the inner chart */
+    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    > [data-testid="stColumn"]:first-child {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        padding: 0 !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Strip inner Plotly chart border/radius — column handles it */
+    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    [data-testid="stPlotlyChart"] {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        background: #ffffff;
+    }
+
+    /* Right column: flex column so stacked panels fill naturally */
+    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    > [data-testid="stColumn"]:last-child {
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 0 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ── Main content ───────────────────────────────────────────────────────
 MAP_H = 520
 
@@ -168,7 +214,7 @@ with map_col:
             showframe=False,    bgcolor="#ffffff",
         ),
         paper_bgcolor="#ffffff",
-        margin=dict(l=8, r=8, t=36, b=8),
+        margin=dict(l=0, r=0, t=30, b=0),
         height=MAP_H,
         title=dict(text="Port Congestion Map", font=dict(color="#64748b", size=12), x=0),
         legend=dict(
