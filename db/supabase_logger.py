@@ -35,20 +35,31 @@ def _url() -> str:
 
 
 def _connect():
-    """Return a fresh psycopg2 connection, or None if unavailable."""
+    """
+    Return a fresh psycopg2 connection, or None if unavailable.
+
+    Parses the URL manually so special characters in the password
+    (e.g. !, @, #) don't break the connection string parser.
+    """
     if not _PSYCOPG2_OK:
         return None
     u = _url()
     if not u:
         return None
     try:
-        return psycopg2.connect(u, connect_timeout=5, sslmode="require")
+        from urllib.parse import urlparse, unquote
+        p = urlparse(u)
+        return psycopg2.connect(
+            host=p.hostname,
+            port=p.port or 5432,
+            dbname=(p.path or "/postgres").lstrip("/"),
+            user=p.username,
+            password=unquote(p.password or ""),
+            connect_timeout=10,
+            sslmode="require",
+        )
     except Exception:
-        try:
-            # Fallback without explicit sslmode (some connection strings include it already)
-            return psycopg2.connect(u, connect_timeout=5)
-        except Exception:
-            return None
+        return None
 
 
 def _ensure_table(conn) -> None:
