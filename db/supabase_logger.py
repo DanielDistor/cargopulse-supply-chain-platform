@@ -90,8 +90,7 @@ def test_connection() -> dict:
 def log_snapshot(total: int) -> None:
     """
     Insert one row into vessel_activity per page load.
-    Skips if a row was already written in the last 60 seconds
-    (guards against rapid refresh spam).
+    Skips if a row was already written in the last 60 seconds.
     """
     if not _HTTPX_OK:
         return
@@ -108,7 +107,7 @@ def log_snapshot(total: int) -> None:
             timeout=5,
         )
         if r.status_code == 200 and r.json():
-            return  # already logged in the last minute — skip
+            return
         httpx.post(
             f"{base}/rest/v1/vessel_activity",
             headers=_headers(),
@@ -121,11 +120,11 @@ def log_snapshot(total: int) -> None:
 
 def log_vessel_mmsis(mmsis: list) -> None:
     """
-    Insert vessel MMSIs seen today into vessel_daily — only new ones.
+    Record distinct vessel MMSIs seen today into vessel_daily.
 
-    Fetches the MMSIs already recorded for today first, then inserts
-    only the difference. No upsert magic needed — plain INSERT after
-    Python-side filtering guarantees no duplicates.
+    Uses database-level ON CONFLICT DO NOTHING (resolution=ignore-duplicates)
+    so the PRIMARY KEY (mmsi, day) handles dedup atomically — no Python-side
+    GET + filter needed, and no 1000-row cap to worry about.
     """
     if not _HTTPX_OK or not mmsis:
         return
@@ -133,36 +132,25 @@ def log_vessel_mmsis(mmsis: list) -> None:
     if not base or not _key():
         return
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    rows  = [{"mmsi": str(m), "day": today} for m in mmsis if m]
+    if not rows:
+        return
 
-    try:
-        # Fetch MMSIs already logged today
-        r = httpx.get(
-            f"{base}/rest/v1/vessel_daily",
-            headers=_headers(),
-            params={"select": "mmsi", "day": f"eq.{today}", "limit": "50000"},
-            timeout=10,
-        )
-        existing = {row["mmsi"] for row in r.json()} if r.status_code == 200 else set()
-
-        # Only insert MMSIs we haven't seen yet today
-        new_rows = [
-            {"mmsi": str(m), "day": today}
-            for m in mmsis
-            if m and str(m) not in existing
-        ]
-        if not new_rows:
-            return
-
-        # Plain INSERT in batches of 500
-        for i in range(0, len(new_rows), 500):
-            httpx.post(
+    # resolution=ignore-duplicates → INSERT ... ON CONFLICT DO NOTHING
+    # PostgREST uses the table's PRIMARY KEY (mmsi, day) automatically.
+    hdrs = _headers({"Prefer": "resolution=ignore-duplicates,return=minimal"})
+    for i in range(0, len(rows), 500):
+        try:
+            r = httpx.post(
                 f"{base}/rest/v1/vessel_daily",
-                headers=_headers(),
-                json=new_rows[i : i + 500],
+                headers=hdrs,
+                json=rows[i : i + 500],
                 timeout=15,
             )
-    except Exception:
-        pass
+            if r.status_code not in (200, 201):
+                print(f"vessel_daily insert error: HTTP {r.status_code} — {r.text[:200]}")
+        except Exception as e:
+            print(f"vessel_daily insert exception: {e}")
 
 
 def get_daily_distinct_vessels(days: int = 7) -> list:
@@ -170,8 +158,7 @@ def get_daily_distinct_vessels(days: int = 7) -> list:
     Returns one row per calendar day: count of distinct vessels seen that day.
     Each row dict: {"day": "2024-05-28", "vessel_count": int}
 
-    Reads from vessel_daily where each (mmsi, day) pair is unique,
-    so this is a true distinct-vessel count — not a snapshot average.
+    Uses Range header to override Supabase's default 1000-row cap.
     """
     if not _HTTPX_OK:
         return []
@@ -180,15 +167,15 @@ def get_daily_distinct_vessels(days: int = 7) -> list:
         return []
     try:
         since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+        # Range: 0-49999 overrides the default 1000-row server cap
         r = httpx.get(
             f"{base}/rest/v1/vessel_daily",
-            headers=_headers(),
+            headers=_headers({"Range": "0-49999"}),
             params={"select": "day",
-                    "day":    f"gte.{since}",
-                    "limit":  "50000"},
-            timeout=10,
+                    "day":    f"gte.{since}"},
+            timeout=15,
         )
-        if r.status_code != 200:
+        if r.status_code not in (200, 206):
             return []
         buckets: dict = defaultdict(int)
         for row in r.json():

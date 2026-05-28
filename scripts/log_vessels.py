@@ -83,10 +83,10 @@ def main() -> None:
 
     if count > 0:
         supabase_logger.log_snapshot(count)
-        print("Logged snapshot to vessel_activity ✓")
+        print(f"Logged snapshot ({count} vessels) to vessel_activity ✓")
 
         supabase_logger.log_vessel_mmsis(mmsis)
-        print(f"Upserted {len(mmsis)} MMSIs to vessel_daily ✓")
+        print(f"Sent {len(mmsis)} MMSIs to vessel_daily (dupes ignored by DB) ✓")
     else:
         print("No vessels found — skipping log")
 
