@@ -89,10 +89,9 @@ st.markdown(
 # ── KPI row ────────────────────────────────────────────────────────────
 def _kpi(label, value, sub, sub_color="#6b7fa3", border_color=None):
     bl = f"border-left:3px solid {border_color};" if border_color else ""
-    br = "0 10px 10px 0" if border_color else "10px"
     return (
         f'<div style="background:#1a1f2e;border:1px solid #263044;{bl}'
-        f'border-radius:{br};padding:14px 18px;height:88px;'
+        f'border-radius:10px;padding:16px 20px;height:88px;'
         f'display:flex;flex-direction:column;justify-content:space-between;">'
         f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{label}</div>'
         f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{value}</div>'
