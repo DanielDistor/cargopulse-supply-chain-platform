@@ -121,10 +121,11 @@ def log_snapshot(total: int) -> None:
 
 def log_vessel_mmsis(mmsis: list) -> None:
     """
-    Upsert vessel MMSIs seen today into vessel_daily.
-    Primary key is (mmsi, day) so duplicates within a day are ignored —
-    each vessel is counted only once per calendar day regardless of how
-    many snapshots it appears in.
+    Insert vessel MMSIs seen today into vessel_daily — only new ones.
+
+    Fetches the MMSIs already recorded for today first, then inserts
+    only the difference. No upsert magic needed — plain INSERT after
+    Python-side filtering guarantees no duplicates.
     """
     if not _HTTPX_OK or not mmsis:
         return
@@ -132,19 +133,32 @@ def log_vessel_mmsis(mmsis: list) -> None:
     if not base or not _key():
         return
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    rows  = [{"mmsi": str(m), "day": today} for m in mmsis if m]
-    if not rows:
-        return
+
     try:
-        # Send in batches of 500 to stay within request size limits
-        batch_size = 500
-        hdrs = _headers({"Prefer": "resolution=ignore-duplicates,return=minimal"})
-        for i in range(0, len(rows), batch_size):
+        # Fetch MMSIs already logged today
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_daily",
+            headers=_headers(),
+            params={"select": "mmsi", "day": f"eq.{today}", "limit": "50000"},
+            timeout=10,
+        )
+        existing = {row["mmsi"] for row in r.json()} if r.status_code == 200 else set()
+
+        # Only insert MMSIs we haven't seen yet today
+        new_rows = [
+            {"mmsi": str(m), "day": today}
+            for m in mmsis
+            if m and str(m) not in existing
+        ]
+        if not new_rows:
+            return
+
+        # Plain INSERT in batches of 500
+        for i in range(0, len(new_rows), 500):
             httpx.post(
                 f"{base}/rest/v1/vessel_daily",
-                headers=hdrs,
-                params={"on_conflict": "mmsi,day"},
-                json=rows[i : i + batch_size],
+                headers=_headers(),
+                json=new_rows[i : i + 500],
                 timeout=15,
             )
     except Exception:
