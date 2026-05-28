@@ -2,7 +2,9 @@ import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.graph_objects as go
+import plotly.io as pio
 import pandas as pd
 from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc
@@ -126,265 +128,216 @@ c4.markdown(_kpi("BDI",             bdi_display,                 f"{bdi_chg:+.1f
 # Spacer so KPI row doesn't visually bleed into the panels below
 st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
-# ── Map card CSS ───────────────────────────────────────────────────────
-st.markdown(
-    """
-    <style>
-    /* ════════════════════════════════════════════════════════════════════
-       MAP CARD — corner clipping + equal-height grid
-       Scope: only elements inside the row that owns the Plotly chart.
-       ════════════════════════════════════════════════════════════════════ */
+# ── Main content — rendered as one components.html block ───────────────
+# components.html() renders inside an iframe where we own the full DOM.
+# This is the only reliable way to get border-radius clipping + equal-height
+# columns in Streamlit — CSS selectors on Streamlit's emotion-wrapped divs
+# cannot reliably override internal stacking contexts and intermediate padding.
 
-    /* ── Row: equal-height flex, no wrap ─────────────────────────────── */
-    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"]) {
-        display:        flex    !important;
-        flex-direction: row     !important;
-        flex-wrap:      nowrap  !important;   /* prevent columns from stacking */
-        align-items:    stretch !important;   /* both columns same height     */
-    }
+LC    = {"Clear": "#22c55e", "Moderate": "#f59e0b", "High": "#ef4444", "Critical": "#dc2626"}
+GAP   = "10px"
+PANEL = (
+    'background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
+    f'padding:16px;display:flex;flex-direction:column;gap:{GAP};'
+)
+TITLE = 'color:#1e293b;font-size:15px;font-weight:700;'
 
-    /* ── Map column: card styling ─────────────────────────────────────
-       contain:paint is the key — it enforces the border-radius clip on ALL
-       descendant content (including Plotly's own divs) more reliably than
-       overflow:hidden alone, which can be bypassed by inner stacking contexts.
-       ──────────────────────────────────────────────────────────────── */
-    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"]) {
-        background:     #ffffff;
-        border:         1px solid #e2e8f0;
-        border-radius:  16px !important;
-        overflow:       hidden !important;
-        contain:        paint;              /* paints only within border-radius */
-        box-shadow:     0 1px 3px rgba(0,0,0,0.04);
-        padding:        0 !important;
-        display:        flex !important;
-        flex-direction: column !important;
-        align-self:     stretch !important;
-    }
+# ── Build Plotly figure ─────────────────────────────────────────────────
+SECTION_H = 620   # section height; map fills left card, right panels fill right col
 
-    /* ── Strip padding from every intermediate Streamlit wrapper ───────
-       stVerticalBlock and element-container both add padding by default;
-       that gap between the column edge and the chart content is what makes
-       the rounded corners appear invisible (white gap fills the arc).
-       ──────────────────────────────────────────────────────────────── */
-    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"])
-    > div[data-testid="stVerticalBlock"] {
-        padding:        0 !important;
-        margin:         0 !important;
-        gap:            0 !important;
-        flex:           1;
-        display:        flex !important;
-        flex-direction: column !important;
-    }
-
-    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"])
-    div[data-testid="element-container"] {
-        padding: 0 !important;
-        margin:  0 !important;
-    }
-
-    /* ── Inner Plotly element: remove its own border/radius ──────────── */
-    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"])
-    div[data-testid="stPlotlyChart"] {
-        border:        none !important;
-        border-radius: 0    !important;
-        box-shadow:    none !important;
-        padding:       0    !important;
-        margin:        0    !important;
-        background:    #ffffff;
-    }
-
-    /* ── Right column: flex column, stretch to row height ───────────── */
-    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"])
-    > div[data-testid="stColumn"]:last-child {
-        display:        flex    !important;
-        flex-direction: column  !important;
-        align-self:     stretch !important;
-        padding:        0       !important;
-    }
-
-    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"])
-    > div[data-testid="stColumn"]:last-child
-    > div[data-testid="stVerticalBlock"] {
-        flex:           1;
-        display:        flex    !important;
-        flex-direction: column  !important;
-        padding:        0       !important;
-        gap:            0       !important;
-    }
-
-    /* Make the right-panel markdown block fill available vertical space */
-    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"])
-    > div[data-testid="stColumn"]:last-child
-    div[data-testid="stMarkdownContainer"] {
-        flex:           1;
-        display:        flex    !important;
-        flex-direction: column  !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
+fig = go.Figure()
+if not df_cong.empty:
+    for label, color in LC.items():
+        sub = df_cong[df_cong["label"] == label]
+        if sub.empty:
+            continue
+        fig.add_trace(go.Scattergeo(
+            lat=sub["lat"].tolist(),
+            lon=sub["lon"].tolist(),
+            mode="markers",
+            name=label,
+            marker=dict(
+                size=sub["score"].apply(lambda s: max(5, s / 7 + 5)).tolist(),
+                color=color,
+                opacity=0.85,
+                line=dict(width=0),
+            ),
+            showlegend=True,
+            hovertext=sub.apply(
+                lambda r: f"<b>{r['name']}</b><br>Score: {r['score']}/100 — {r['label']}<br>Vessels: {r['vessel_count']}",
+                axis=1,
+            ).tolist(),
+            hovertemplate="%{hovertext}<extra></extra>",
+        ))
+fig.update_layout(
+    geo=dict(
+        projection_type="natural earth",
+        showland=True,      landcolor="#dde8ef",
+        showocean=True,     oceancolor="#ffffff",
+        showlakes=False,
+        showcountries=True, countrycolor="#94a3b8",
+        showframe=False,    bgcolor="#ffffff",
+    ),
+    paper_bgcolor="#ffffff",
+    margin=dict(l=0, r=0, t=30, b=0),
+    height=SECTION_H,
+    title=dict(text="Port Congestion Map", font=dict(color="#64748b", size=12), x=0),
+    legend=dict(
+        bgcolor="#ffffff", bordercolor="#e2e8f0",
+        font=dict(color="#64748b", size=11),
+        orientation="h", yanchor="bottom", y=0.01, xanchor="left", x=0.0,
+    ),
 )
 
-# ── Main content ───────────────────────────────────────────────────────
-MAP_H = 520
+# Serialize figure to HTML fragment (CDN plotly.js, scripts execute inside iframe)
+chart_html = pio.to_html(
+    fig,
+    include_plotlyjs="cdn",
+    full_html=False,
+    config={"displayModeBar": False, "scrollZoom": False, "responsive": True},
+)
 
-map_col, right_col = st.columns([3, 2])
-LC = {"Clear": "#22c55e", "Moderate": "#f59e0b", "High": "#ef4444", "Critical": "#dc2626"}
-
-# ── Left: world map ────────────────────────────────────────────────────
-with map_col:
-    fig = go.Figure()
-    if not df_cong.empty:
-        for label, color in LC.items():
-            sub = df_cong[df_cong["label"] == label]
-            if sub.empty:
-                continue
-            fig.add_trace(go.Scattergeo(
-                lat=sub["lat"].tolist(),
-                lon=sub["lon"].tolist(),
-                mode="markers",
-                name=label,
-                marker=dict(
-                    size=sub["score"].apply(lambda s: max(5, s / 7 + 5)).tolist(),
-                    color=color,
-                    opacity=0.85,
-                    line=dict(width=0),
-                ),
-                showlegend=True,
-                hovertext=sub.apply(
-                    lambda r: f"<b>{r['name']}</b><br>Score: {r['score']}/100 — {r['label']}<br>Vessels: {r['vessel_count']}",
-                    axis=1,
-                ).tolist(),
-                hovertemplate="%{hovertext}<extra></extra>",
-            ))
-    fig.update_layout(
-        geo=dict(
-            projection_type="natural earth",
-            showland=True,      landcolor="#dde8ef",
-            showocean=True,     oceancolor="#ffffff",
-            showlakes=False,
-            showcountries=True, countrycolor="#94a3b8",
-            showframe=False,    bgcolor="#ffffff",
-        ),
-        paper_bgcolor="#ffffff",
-        margin=dict(l=0, r=0, t=30, b=0),
-        height=MAP_H,
-        title=dict(text="Port Congestion Map", font=dict(color="#64748b", size=12), x=0),
-        legend=dict(
-            bgcolor="#ffffff", bordercolor="#e2e8f0",
-            font=dict(color="#64748b", size=11),
-            orientation="h", yanchor="bottom", y=0.01, xanchor="left", x=0.0,
-        ),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# ── Right: two panel boxes — flex gap controls ALL spacing uniformly ───
-with right_col:
-    # One gap value used everywhere: between title→card and card→card.
-    # No individual margin-bottom anywhere — that was the unevenness.
-    GAP = "10px"
-    PANEL = (
-        f'background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
-        f'padding:16px;display:flex;flex-direction:column;gap:{GAP};'
-    )
-    TITLE = 'color:#1e293b;font-size:15px;font-weight:700;'
-
-    # ── Port rows ───────────────────────────────────────────────────────
-    port_html = ""
-    for _, row in df_cong.head(2).iterrows():
-        lc = LC.get(row.get("label", ""), "#64748b")
-        port_html += (
-            f'<div style="background:#f8fafc;border-radius:10px;padding:14px 16px;'
-            f'display:flex;align-items:center;border-left:3px solid {lc};">'
-            f'<div style="flex:1;min-width:0;">'
-            f'<div style="color:#1e293b;font-size:14px;font-weight:600;'
-            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-            f'<div style="color:#94a3b8;font-size:12px;margin-top:4px">'
-            f'{row["country"]} · {row["vessel_count"]} vessels</div>'
-            f'</div>'
-            f'<div style="flex-shrink:0;margin-left:12px;">'
-            f'<span style="color:{lc};font-size:22px;font-weight:800">{row["score"]}</span>'
-            f'<span style="color:#94a3b8;font-size:11px"> /100</span>'
-            f'</div>'
-            f'</div>'
-        )
-    if not port_html:
-        port_html = (
-            '<div style="background:#f8fafc;border-radius:10px;padding:14px 16px;'
-            'color:#94a3b8;font-size:13px">No congestion data yet</div>'
-        )
-
-    # ── Alert / news cards — match reference style exactly ─────────────
-    # Reference: colored tint background, NO left border, bold colored title,
-    # description line, small gray timestamp. No badge — just the title text.
-    alert_html = ""
-    n_cards = 0
-
-    for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
-        if n_cards >= 3:
-            break
-        is_crit = row["score"] >= 86
-        col     = "#ef4444" if is_crit else "#f59e0b"
-        bg      = "#fef2f2" if is_crit else "#fffbeb"
-        title   = f'Critical Congestion Detected' if is_crit else f'High Congestion Alert'
-        alert_html += (
-            f'<div style="background:{bg};border-radius:10px;padding:14px 16px;">'
-            f'<div style="color:{col};font-size:13px;font-weight:700">{title}</div>'
-            f'<div style="color:#475569;font-size:12px;margin-top:4px">'
-            f'{row["name"]} · {row["score"]}/100 · {row["vessel_count"]} vessels</div>'
-            f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Just now</div>'
-            f'</div>'
-        )
-        n_cards += 1
-
-    if bdi.get("trend") == "rising" and n_cards < 3:
-        alert_html += (
-            f'<div style="background:#fffbeb;border-radius:10px;padding:14px 16px;">'
-            f'<div style="color:#f59e0b;font-size:13px;font-weight:700">Freight Rate Rising</div>'
-            f'<div style="color:#475569;font-size:12px;margin-top:4px">'
-            f'BDI index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
-            f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Just now</div>'
-            f'</div>'
-        )
-        n_cards += 1
-
-    for item in news_items[:3 - n_cards]:
-        if n_cards >= 3:
-            break
-        url_a = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
-        alert_html += (
-            f'<div style="background:#eff6ff;border-radius:10px;padding:14px 16px;">'
-            f'<div style="color:#3b82f6;font-size:13px;font-weight:700">'
-            f'<a {url_a} style="color:#3b82f6;text-decoration:none;'
-            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">'
-            f'{item["title"]}</a></div>'
-            f'<div style="color:#475569;font-size:12px;margin-top:4px">{item["source"]}</div>'
-            f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Maritime News</div>'
-            f'</div>'
-        )
-        n_cards += 1
-
-    if not alert_html:
-        alert_html = (
-            '<div style="background:#f0fdf4;border-radius:10px;padding:14px 16px;">'
-            '<div style="color:#22c55e;font-size:13px;font-weight:700">All Systems Clear</div>'
-            '<div style="color:#475569;font-size:12px;margin-top:4px">No active congestion alerts</div>'
-            '<div style="color:#94a3b8;font-size:11px;margin-top:4px">All ports below threshold</div>'
-            '</div>'
-        )
-
-    # Outer wrapper fills 100% of the right column height via flex.
-    # Live Alerts panel gets flex:1 so it expands to meet the map card's bottom.
-    right_html = (
-        f'<div style="display:flex;flex-direction:column;gap:{GAP};height:100%;">'
-        f'<div style="{PANEL}">'
-        f'<div style="{TITLE}">📍 Top Congested Ports</div>'
-        + port_html +
+# ── Build right-panel HTML ──────────────────────────────────────────────
+port_html = ""
+for _, row in df_cong.head(2).iterrows():
+    lc = LC.get(row.get("label", ""), "#64748b")
+    port_html += (
+        f'<div style="background:#f8fafc;border-radius:10px;padding:14px 16px;'
+        f'display:flex;align-items:center;border-left:3px solid {lc};">'
+        f'<div style="flex:1;min-width:0;">'
+        f'<div style="color:#1e293b;font-size:14px;font-weight:600;'
+        f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
+        f'<div style="color:#94a3b8;font-size:12px;margin-top:4px">'
+        f'{row["country"]} · {row["vessel_count"]} vessels</div>'
         f'</div>'
-        f'<div style="{PANEL}flex:1;">'
-        f'<div style="{TITLE}">🔔 Live Alerts &amp; News</div>'
-        + alert_html +
+        f'<div style="flex-shrink:0;margin-left:12px;">'
+        f'<span style="color:{lc};font-size:22px;font-weight:800">{row["score"]}</span>'
+        f'<span style="color:#94a3b8;font-size:11px"> /100</span>'
         f'</div>'
         f'</div>'
     )
-    st.markdown(right_html, unsafe_allow_html=True)
+if not port_html:
+    port_html = (
+        '<div style="background:#f8fafc;border-radius:10px;padding:14px 16px;'
+        'color:#94a3b8;font-size:13px">No congestion data yet</div>'
+    )
+
+alert_html = ""
+n_cards = 0
+
+for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
+    if n_cards >= 3:
+        break
+    is_crit = row["score"] >= 86
+    col     = "#ef4444" if is_crit else "#f59e0b"
+    bg      = "#fef2f2" if is_crit else "#fffbeb"
+    title   = "Critical Congestion Detected" if is_crit else "High Congestion Alert"
+    alert_html += (
+        f'<div style="background:{bg};border-radius:10px;padding:14px 16px;">'
+        f'<div style="color:{col};font-size:13px;font-weight:700">{title}</div>'
+        f'<div style="color:#475569;font-size:12px;margin-top:4px">'
+        f'{row["name"]} · {row["score"]}/100 · {row["vessel_count"]} vessels</div>'
+        f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Just now</div>'
+        f'</div>'
+    )
+    n_cards += 1
+
+if bdi.get("trend") == "rising" and n_cards < 3:
+    alert_html += (
+        f'<div style="background:#fffbeb;border-radius:10px;padding:14px 16px;">'
+        f'<div style="color:#f59e0b;font-size:13px;font-weight:700">Freight Rate Rising</div>'
+        f'<div style="color:#475569;font-size:12px;margin-top:4px">'
+        f'BDI index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
+        f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Just now</div>'
+        f'</div>'
+    )
+    n_cards += 1
+
+for item in news_items[:3 - n_cards]:
+    if n_cards >= 3:
+        break
+    url_a = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
+    alert_html += (
+        f'<div style="background:#eff6ff;border-radius:10px;padding:14px 16px;">'
+        f'<div style="color:#3b82f6;font-size:13px;font-weight:700">'
+        f'<a {url_a} style="color:#3b82f6;text-decoration:none;'
+        f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">'
+        f'{item["title"]}</a></div>'
+        f'<div style="color:#475569;font-size:12px;margin-top:4px">{item["source"]}</div>'
+        f'<div style="color:#94a3b8;font-size:11px;margin-top:4px">Maritime News</div>'
+        f'</div>'
+    )
+    n_cards += 1
+
+if not alert_html:
+    alert_html = (
+        '<div style="background:#f0fdf4;border-radius:10px;padding:14px 16px;">'
+        '<div style="color:#22c55e;font-size:13px;font-weight:700">All Systems Clear</div>'
+        '<div style="color:#475569;font-size:12px;margin-top:4px">No active congestion alerts</div>'
+        '<div style="color:#94a3b8;font-size:11px;margin-top:4px">All ports below threshold</div>'
+        '</div>'
+    )
+
+# ── Render as single iframe — full CSS control, no Streamlit wrappers ──
+section_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+*,*::before,*::after{{margin:0;padding:0;box-sizing:border-box;}}
+html,body{{
+    width:100%;height:{SECTION_H}px;
+    background:transparent;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}}
+.cp-row{{
+    display:flex;
+    gap:12px;
+    height:100%;
+    align-items:stretch;
+}}
+/* Map card — border-radius works here because we own the DOM */
+.cp-map{{
+    flex:3;min-width:0;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);
+}}
+.cp-map>div{{height:100%;}}
+/* Right column */
+.cp-right{{
+    flex:2;min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    height:100%;
+}}
+.cp-right-top{{flex-shrink:0;}}
+.cp-right-bot{{flex:1;display:flex;flex-direction:column;}}
+.cp-right-bot>div:last-child{{flex:1;}}
+</style>
+</head>
+<body>
+<div class="cp-row">
+    <div class="cp-map">{chart_html}</div>
+    <div class="cp-right">
+        <div class="cp-right-top">
+            <div style="{PANEL}">
+                <div style="{TITLE}">📍 Top Congested Ports</div>
+                {port_html}
+            </div>
+        </div>
+        <div class="cp-right-bot">
+            <div style="{PANEL}flex:1;">
+                <div style="{TITLE}">🔔 Live Alerts &amp; News</div>
+                {alert_html}
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>"""
+
+components.html(section_html, height=SECTION_H + 2, scrolling=False)
