@@ -112,7 +112,7 @@ c4.markdown(_kpi("BDI",             str(bdi.get("value", "—")), f"{bdi_chg:+.1
 
 # ── Main content ───────────────────────────────────────────────────────
 # Map height and right-panel height are kept identical so both columns end together.
-MAP_H = 440
+MAP_H = 520
 
 map_col, right_col = st.columns([3, 2])
 LC = {"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"}
@@ -164,28 +164,43 @@ with map_col:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# ── Right: ports + alerts in one fixed-height HTML block ───────────────
+# ── Right: ports + alerts — equal-height cards, full border-radius ─────
 with right_col:
-    # Build ports HTML (top 2 only — keeps right panel from overflowing)
+    # Each card is a fixed height so every card looks identical (like reference)
+    CARD_H   = "72px"
+    CARD_MB  = "10px"
+
+    # ── Top Congested Ports (2 cards) ──────────────────────────────────
     ports_html = ""
     for _, row in df_cong.head(2).iterrows():
         lc = LC.get(row.get("label", ""), "#a0aab4")
         ports_html += (
-            f'<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:8px;'
-            f'background:#1a1f2e;border-radius:8px;border:1px solid #263044;border-left:3px solid {lc};">'
+            f'<div style="height:{CARD_H};display:flex;align-items:center;'
+            f'padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
+            f'background:#1a1f2e;border-radius:8px;'
+            f'border:1px solid #263044;border-left:3px solid {lc};">'
             f'<div style="flex:1;min-width:0;">'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-            f'<div style="color:#5a6a7e;font-size:12px;margin-top:3px">{row["country"]} · {row["vessel_count"]} vessels</div>'
+            f'<div style="color:#5a6a7e;font-size:12px;margin-top:4px">'
+            f'{row["country"]} · {row["vessel_count"]} vessels</div>'
             f'</div>'
-            f'<div style="text-align:right;flex-shrink:0;margin-left:12px;">'
-            f'<span style="color:{lc};font-size:20px;font-weight:800">{row["score"]}</span>'
+            f'<div style="flex-shrink:0;margin-left:12px;text-align:right;">'
+            f'<span style="color:{lc};font-size:22px;font-weight:800">{row["score"]}</span>'
             f'<span style="color:#5a6a7e;font-size:11px"> /100</span>'
             f'</div>'
             f'</div>'
         )
+    if not ports_html:
+        ports_html = (
+            f'<div style="height:{CARD_H};display:flex;align-items:center;'
+            f'padding:0 16px;margin-bottom:{CARD_MB};'
+            f'background:#1a1f2e;border-radius:8px;border:1px solid #263044;">'
+            f'<div style="color:#5a6a7e;font-size:13px">No congestion data yet</div>'
+            f'</div>'
+        )
 
-    # Build alerts + news HTML — hard cap at 3 cards total so nothing overflows
+    # ── Live Alerts & News (max 3 cards, alerts first then news) ───────
     cards_html = ""
     cards_added = 0
 
@@ -195,14 +210,16 @@ with right_col:
         sev   = "CRITICAL" if row["score"] >= 86 else "HIGH"
         color = "#b71c1c"  if sev == "CRITICAL"  else "#ef5350"
         cards_html += (
-            f'<div style="background:{color}18;border:1px solid {color}44;'
-            f'border-left:3px solid {color};border-radius:0 8px 8px 0;'
-            f'padding:11px 14px;margin-bottom:8px;">'
+            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
+            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
+            f'background:{color}18;border:1px solid {color}44;'
+            f'border-left:3px solid {color};border-radius:8px;">'
             f'<div style="color:{color};font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">{sev}</div>'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">'
+            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
             f'Congestion {row["score"]}/100 · {row["vessel_count"]} vessels nearby</div>'
             f'</div>'
         )
@@ -210,9 +227,10 @@ with right_col:
 
     if bdi.get("trend") == "rising" and cards_added < 3:
         cards_html += (
-            f'<div style="background:#ffb74d18;border:1px solid #ffb74d44;'
-            f'border-left:3px solid #ffb74d;border-radius:0 8px 8px 0;'
-            f'padding:11px 14px;margin-bottom:8px;">'
+            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
+            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
+            f'background:#ffb74d18;border:1px solid #ffb74d44;'
+            f'border-left:3px solid #ffb74d;border-radius:8px;">'
             f'<div style="color:#ffb74d;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">WATCH</div>'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">Rising BDI</div>'
@@ -222,16 +240,16 @@ with right_col:
         )
         cards_added += 1
 
-    news_slots = 3 - cards_added
-    for item in get_maritime_news(n=news_slots):
+    for item in get_maritime_news(n=3 - cards_added):
         if cards_added >= 3:
             break
-        url_open  = f'<a href="{item["url"]}" target="_blank" style="text-decoration:none;display:block">' if item.get("url") else '<div>'
-        url_close = '</a>' if item.get("url") else '</div>'
+        url_open  = f'<a href="{item["url"]}" target="_blank" style="text-decoration:none;">' if item.get("url") else ''
+        url_close = '</a>' if item.get("url") else ''
         cards_html += (
-            f'<div style="background:#1a1f2e;border:1px solid #263044;'
-            f'border-left:3px solid #00d4ff;border-radius:0 8px 8px 0;'
-            f'padding:11px 14px;margin-bottom:8px;">'
+            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
+            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
+            f'background:#1a1f2e;border:1px solid #263044;'
+            f'border-left:3px solid #00d4ff;border-radius:8px;">'
             f'<div style="color:#00d4ff;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">NEWS</div>'
             f'{url_open}'
@@ -245,28 +263,26 @@ with right_col:
 
     if not cards_html:
         cards_html = (
-            '<div style="background:#0a2010;border:1px solid #1a6640;'
-            'border-left:3px solid #4caf50;border-radius:0 8px 8px 0;padding:12px 14px;">'
-            '<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase">CLEAR</div>'
-            '<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">No Active Alerts</div>'
-            '<div style="color:#6b7fa3;font-size:12px;margin-top:2px">All ports below threshold</div>'
-            '</div>'
+            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
+            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};'
+            f'background:#0a2010;border:1px solid #1a6640;'
+            f'border-left:3px solid #4caf50;border-radius:8px;">'
+            f'<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase">CLEAR</div>'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">No Active Alerts</div>'
+            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">All ports below threshold</div>'
+            f'</div>'
         )
 
-    # Render entire right column as one block — no extra Streamlit element spacing
+    # Single HTML block — section headers + cards, no fixed outer height
     right_html = (
-        f'<div style="height:{MAP_H}px;display:flex;flex-direction:column;overflow:hidden;">'
         f'<div style="display:flex;flex-direction:column;">'
         f'<div style="color:#a0aab4;font-size:11px;font-weight:600;'
-        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Top Congested Ports</div>'
+        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Top Congested Ports</div>'
         + ports_html +
-        f'</div>'
-        f'<div style="border-top:1px solid #1e2736;margin:10px 0;flex-shrink:0;"></div>'
-        f'<div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">'
+        f'<div style="border-top:1px solid #1e2736;margin:14px 0;"></div>'
         f'<div style="color:#a0aab4;font-size:11px;font-weight:600;'
-        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Live Alerts &amp; News</div>'
+        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Live Alerts &amp; News</div>'
         + cards_html +
-        f'</div>'
         f'</div>'
     )
     st.markdown(right_html, unsafe_allow_html=True)
