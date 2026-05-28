@@ -56,6 +56,11 @@ if vessel_count > 0:
     except Exception:
         pass
 
+# TEMP DEBUG — remove once Supabase confirmed working
+_sb_status = supabase_logger.test_connection()
+if not _sb_status["ok"]:
+    st.warning(f"Supabase debug: {_sb_status}")
+
 critical_n  = int((df_cong["score"] >= 86).sum()) if not df_cong.empty else 0
 high_n      = int(((df_cong["score"] >= 61) & (df_cong["score"] < 86)).sum()) if not df_cong.empty else 0
 alert_count = int((df_cong["score"] >= 60).sum()) + (1 if bdi.get("trend") == "rising" else 0)

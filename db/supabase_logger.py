@@ -58,8 +58,23 @@ def _connect():
             connect_timeout=10,
             sslmode="require",
         )
-    except Exception:
+    except Exception as e:
+        global _last_connect_error
+        _last_connect_error = str(e)
         return None
+
+
+_last_connect_error: str = ""
+
+
+def test_connection() -> dict:
+    """Return a status dict for debugging. Safe to call from the UI."""
+    conn = _connect()
+    if conn:
+        conn.close()
+        return {"ok": True, "error": ""}
+    return {"ok": False, "error": _last_connect_error or "unknown",
+            "psycopg2": _PSYCOPG2_OK, "url_set": bool(_url())}
 
 
 def _ensure_table(conn) -> None:
