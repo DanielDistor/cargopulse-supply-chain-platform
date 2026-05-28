@@ -138,7 +138,7 @@ def navbar(current: str = "") -> None:
     for label, path in _pages:
         if label == current:
             links += (
-                f'<a href="{path}" style="'
+                f'<a href="{path}" target="_self" style="'
                 f'background:rgba(255,255,255,0.15);color:#ffffff;'
                 f'padding:6px 14px;border-radius:6px;'
                 f'font-size:13px;font-weight:600;'
@@ -148,7 +148,7 @@ def navbar(current: str = "") -> None:
             )
         else:
             links += (
-                f'<a href="{path}" class="cp-nav-link" style="'
+                f'<a href="{path}" target="_self" class="cp-nav-link" style="'
                 f'color:rgba(255,255,255,0.72);padding:6px 10px;border-radius:6px;'
                 f'font-size:13px;font-weight:400;'
                 f'text-decoration:none;white-space:nowrap;">'
