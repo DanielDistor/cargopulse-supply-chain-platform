@@ -9,6 +9,33 @@ def inject_global_css() -> None:
         .stApp { background-color: #0f1117; }
         header[data-testid="stHeader"] { background-color: #0f1117; border-bottom: 1px solid #1e2736; }
 
+        /* ── Hide sidebar and its toggle button entirely ── */
+        [data-testid="stSidebar"]       { display: none !important; }
+        [data-testid="collapsedControl"] { display: none !important; }
+        section[data-testid="stSidebarContent"] { display: none !important; }
+
+        /* ── Top-nav page links ── */
+        [data-testid="stPageLink"] { margin: 0 !important; padding: 0 !important; }
+        [data-testid="stPageLink"] a,
+        [data-testid="stPageLink"] a:visited {
+            color: #6b7fa3 !important;
+            text-decoration: none !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            padding: 6px 10px !important;
+            border-radius: 6px !important;
+            white-space: nowrap !important;
+            display: block !important;
+        }
+        [data-testid="stPageLink"] a:hover {
+            color: #e8eaed !important;
+            background: #1e2736 !important;
+        }
+        [data-testid="stPageLink"] a[aria-current="page"] {
+            color: #00d4ff !important;
+            font-weight: 600 !important;
+        }
+
         /* ── Sidebar ── */
         [data-testid="stSidebar"] {
             background-color: #1a1f2e;
@@ -121,6 +148,29 @@ def inject_global_css() -> None:
         [data-testid="stSlider"] [class*="track"] { background-color: #00d4ff !important; }
         </style>
         """,
+        unsafe_allow_html=True,
+    )
+
+
+def navbar() -> None:
+    """Top navigation bar — brand on the left, page links on the right."""
+    brand_col, n1, n2, n3, n4, n5, n6 = st.columns([2.2, 0.9, 1.5, 1.5, 1.4, 1.4, 1.2])
+    with brand_col:
+        st.markdown(
+            '<div style="display:flex;align-items:center;height:36px;">'
+            '<span style="color:#e8eaed;font-size:18px;font-weight:800;'
+            'letter-spacing:-0.01em">CargoPulse</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with n1: st.page_link("Home.py",                    label="Home")
+    with n2: st.page_link("pages/1_Vessel_Tracking.py", label="Vessel Tracking")
+    with n3: st.page_link("pages/2_Port_Congestion.py", label="Port Congestion")
+    with n4: st.page_link("pages/3_Delay_Forecast.py",  label="Delay Forecast")
+    with n5: st.page_link("pages/4_Supplier_Risk.py",   label="Supplier Risk")
+    with n6: st.page_link("pages/5_Risk_Alerts.py",     label="Risk Alerts")
+    st.markdown(
+        '<hr style="margin:4px 0 20px 0;border:none;border-top:1px solid #1e2736;">',
         unsafe_allow_html=True,
     )
 

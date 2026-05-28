@@ -8,12 +8,13 @@ from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc
 from services.shipping_rates import get_bdi
 from db import cache
-from components.styles import inject_global_css
+from components.styles import inject_global_css, navbar
 
 load_dotenv()
 
 st.set_page_config(page_title="Risk Alerts | CargoPulse", layout="wide")
 inject_global_css()
+navbar()
 
 PORTS_PATH = os.path.join(os.path.dirname(__file__), "..", "db", "ports.json")
 with open(PORTS_PATH) as f:

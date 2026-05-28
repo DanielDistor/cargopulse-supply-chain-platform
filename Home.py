@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc
 from services.shipping_rates import get_bdi
 from db import cache
-from components.styles import inject_global_css
+from components.styles import inject_global_css, navbar
 
 load_dotenv()
 
@@ -17,6 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 inject_global_css()
+navbar()
 
 PORTS_PATH = os.path.join(os.path.dirname(__file__), "db", "ports.json")
 with open(PORTS_PATH) as f:
@@ -49,35 +50,26 @@ is_live      = is_connected and vessel_age < 900
 conn_color   = "#4caf50" if is_connected else "#ef5350"
 live_color   = "#4caf50" if is_live      else "#ffb74d"
 
-st.markdown(f"""
-<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-    <div>
-        <div style="font-size:28px;font-weight:800;color:#e8eaed;margin-bottom:6px;">🚢 CargoPulse</div>
-        <div style="color:#6b7fa3;font-size:14px">
-            Supply chain risk intelligence — live data from AISstream, Open-Meteo Marine, and Baltic Dry Index.
-        </div>
-    </div>
-    <div style="display:flex;gap:20px;align-items:center;padding-top:6px;flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:7px;">
-            <div style="width:9px;height:9px;border-radius:50%;background:{conn_color};box-shadow:0 0 8px {conn_color}"></div>
-            <span style="color:#a0aab4;font-size:13px;font-weight:600">Connected</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:7px;">
-            <div style="width:9px;height:9px;border-radius:50%;background:{live_color};box-shadow:0 0 8px {live_color}"></div>
-            <span style="color:#a0aab4;font-size:13px;font-weight:600">Live Monitoring</span>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
 age_str = f"{vessel_age // 60}m {vessel_age % 60}s ago" if vessel_age else "fetching..."
 st.markdown(
-    f'<div style="display:flex;gap:24px;padding:8px 14px;background:#1a1f2e;border:1px solid #263044;'
-    f'border-radius:8px;margin-bottom:24px;flex-wrap:wrap;">'
-    f'<span style="color:#5a6a7e;font-size:12px">🛰 <b style="color:#a0aab4">AIS</b> · {age_str}</span>'
-    f'<span style="color:#5a6a7e;font-size:12px">🌊 <b style="color:#a0aab4">Marine Weather</b> · Open-Meteo (3h cache)</span>'
-    f'<span style="color:#5a6a7e;font-size:12px">📈 <b style="color:#a0aab4">BDI</b> · {bdi.get("value","N/A")} ({bdi.get("trend","N/A")} trend, daily)</span>'
-    f'<span style="color:#5a6a7e;font-size:12px">🗺 <b style="color:#a0aab4">Ports Monitored</b> · {len(ports)}</span>'
+    f'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;'
+    f'background:#1a1f2e;border:1px solid #263044;border-radius:8px;margin-bottom:24px;flex-wrap:wrap;gap:12px;">'
+    f'<div style="display:flex;gap:20px;flex-wrap:wrap;">'
+    f'<span style="color:#5a6a7e;font-size:12px">AIS · <b style="color:#a0aab4">{age_str}</b></span>'
+    f'<span style="color:#5a6a7e;font-size:12px">Weather · <b style="color:#a0aab4">Open-Meteo (3h cache)</b></span>'
+    f'<span style="color:#5a6a7e;font-size:12px">BDI · <b style="color:#a0aab4">{bdi.get("value","N/A")} ({bdi.get("trend","N/A")})</b></span>'
+    f'<span style="color:#5a6a7e;font-size:12px">Ports · <b style="color:#a0aab4">{len(ports)}</b></span>'
+    f'</div>'
+    f'<div style="display:flex;gap:16px;align-items:center;flex-shrink:0;">'
+    f'<div style="display:flex;align-items:center;gap:6px;">'
+    f'<div style="width:7px;height:7px;border-radius:50%;background:{conn_color};box-shadow:0 0 6px {conn_color}"></div>'
+    f'<span style="color:#a0aab4;font-size:12px">Connected</span>'
+    f'</div>'
+    f'<div style="display:flex;align-items:center;gap:6px;">'
+    f'<div style="width:7px;height:7px;border-radius:50%;background:{live_color};box-shadow:0 0 6px {live_color}"></div>'
+    f'<span style="color:#a0aab4;font-size:12px">Live</span>'
+    f'</div>'
+    f'</div>'
     f'</div>',
     unsafe_allow_html=True,
 )

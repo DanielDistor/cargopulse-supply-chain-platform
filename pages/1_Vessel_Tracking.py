@@ -8,12 +8,13 @@ import pandas as pd
 from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc
 from db import cache
-from components.styles import inject_global_css, page_header
+from components.styles import inject_global_css, page_header, navbar
 
 load_dotenv()
 
 st.set_page_config(page_title="Vessel Tracking | CargoPulse", layout="wide")
 inject_global_css()
+navbar()
 page_header(
     "Live Vessel Tracking",
     "Vessel positions within ~50 nautical miles of major ports via terrestrial AIS. Color = movement status."

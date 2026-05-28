@@ -7,12 +7,13 @@ import pandas as pd
 from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc, weather as weather_svc
 from services.shipping_rates import get_bdi
-from components.styles import inject_global_css, page_header
+from components.styles import inject_global_css, page_header, navbar
 
 load_dotenv()
 
 st.set_page_config(page_title="Delay Forecast | CargoPulse", layout="wide")
 inject_global_css()
+navbar()
 page_header(
     "Shipment Delay Forecast",
     "Rule-based delay estimates using live congestion, marine weather, and Baltic Dry Index. Use as one signal among many."
