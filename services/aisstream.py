@@ -84,12 +84,21 @@ async def _fetch_snapshot(bounding_boxes: list, duration_seconds: int) -> list[d
     except Exception:
         pass
 
-    # Merge type codes into position records
+    # Persist any new type codes to the long-lived SQLite lookup table
+    if vessel_types:
+        cache.save_vessel_types(vessel_types)
+
+    # For vessels that didn't send static data this window, pull from the store
+    missing = [m for m in vessels if m not in vessel_types]
+    persisted = cache.load_vessel_types(missing) if missing else {}
+
+    # Merge: current-fetch codes take priority, then persisted codes
     result = []
     for mmsi, v in vessels.items():
-        if mmsi in vessel_types:
+        code = vessel_types.get(mmsi) or persisted.get(mmsi)
+        if code is not None:
             v = dict(v)
-            v["vessel_type_code"] = vessel_types[mmsi]
+            v["vessel_type_code"] = code
         result.append(v)
     return result
 
