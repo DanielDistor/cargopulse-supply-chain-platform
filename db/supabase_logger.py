@@ -143,6 +143,7 @@ def log_vessel_mmsis(mmsis: list) -> None:
             httpx.post(
                 f"{base}/rest/v1/vessel_daily",
                 headers=hdrs,
+                params={"on_conflict": "mmsi,day"},
                 json=rows[i : i + batch_size],
                 timeout=15,
             )
