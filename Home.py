@@ -163,21 +163,22 @@ with map_col:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# ── Right: ports + alerts — equal-height cards, full border-radius ─────
+# ── Right: two panel boxes (like reference) ────────────────────────────
 with right_col:
-    # Each card is a fixed height so every card looks identical (like reference)
-    CARD_H   = "72px"
-    CARD_MB  = "10px"
+    # Row style — sits inside a panel, slightly darker background
+    def _row(content: str, mb: bool = True) -> str:
+        m = "margin-bottom:8px;" if mb else ""
+        return f'<div style="background:#0d1117;border-radius:10px;{m}">{content}</div>'
 
-    # ── Top Congested Ports (2 cards) ──────────────────────────────────
-    ports_html = ""
-    for _, row in df_cong.head(2).iterrows():
+    # ── Panel 1: Top Congested Ports ───────────────────────────────────
+    port_rows = df_cong.head(2)
+    ports_inner = ""
+    for i, (_, row) in enumerate(port_rows.iterrows()):
         lc = LC.get(row.get("label", ""), "#a0aab4")
-        ports_html += (
-            f'<div style="height:{CARD_H};display:flex;align-items:center;'
-            f'padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
-            f'background:#1a1f2e;border-radius:8px;'
-            f'border:1px solid #263044;border-left:3px solid {lc};">'
+        last = (i == len(port_rows) - 1)
+        inner = (
+            f'<div style="display:flex;align-items:center;padding:12px 16px;'
+            f'border-radius:10px;border-left:3px solid {lc};">'
             f'<div style="flex:1;min-width:0;">'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
@@ -190,98 +191,90 @@ with right_col:
             f'</div>'
             f'</div>'
         )
-    if not ports_html:
-        ports_html = (
-            f'<div style="height:{CARD_H};display:flex;align-items:center;'
-            f'padding:0 16px;margin-bottom:{CARD_MB};'
-            f'background:#1a1f2e;border-radius:8px;border:1px solid #263044;">'
-            f'<div style="color:#5a6a7e;font-size:13px">No congestion data yet</div>'
-            f'</div>'
+        ports_inner += _row(inner, mb=not last)
+    if not ports_inner:
+        ports_inner = _row(
+            '<div style="padding:12px 16px;color:#5a6a7e;font-size:13px">No data yet</div>',
+            mb=False,
         )
 
-    # ── Live Alerts & News (max 3 cards, alerts first then news) ───────
-    cards_html = ""
+    # ── Panel 2: Live Alerts & News ────────────────────────────────────
+    cards_inner = ""
     cards_added = 0
 
     for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
         if cards_added >= 3:
             break
         sev   = "CRITICAL" if row["score"] >= 86 else "HIGH"
-        color = "#b71c1c"  if sev == "CRITICAL"  else "#ef5350"
-        cards_html += (
-            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
-            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
-            f'background:{color}18;border:1px solid {color}44;'
-            f'border-left:3px solid {color};border-radius:8px;">'
+        color = "#c62828"  if sev == "CRITICAL"  else "#ef5350"
+        inner = (
+            f'<div style="padding:12px 16px;border-radius:10px;'
+            f'background:{color}22;border-left:3px solid {color};">'
             f'<div style="color:{color};font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">{sev}</div>'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px;'
-            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+            f'<div style="color:#8899a6;font-size:12px;margin-top:2px">'
             f'Congestion {row["score"]}/100 · {row["vessel_count"]} vessels nearby</div>'
             f'</div>'
         )
+        cards_inner += f'<div style="margin-bottom:8px;">{inner}</div>'
         cards_added += 1
 
     if bdi.get("trend") == "rising" and cards_added < 3:
-        cards_html += (
-            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
-            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
-            f'background:#ffb74d18;border:1px solid #ffb74d44;'
-            f'border-left:3px solid #ffb74d;border-radius:8px;">'
+        inner = (
+            f'<div style="padding:12px 16px;border-radius:10px;'
+            f'background:#ffb74d22;border-left:3px solid #ffb74d;">'
             f'<div style="color:#ffb74d;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">WATCH</div>'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">Rising BDI</div>'
-            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">'
+            f'<div style="color:#8899a6;font-size:12px;margin-top:2px">'
             f'Index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
             f'</div>'
         )
+        cards_inner += f'<div style="margin-bottom:8px;">{inner}</div>'
         cards_added += 1
 
     for item in get_maritime_news(n=3 - cards_added):
         if cards_added >= 3:
             break
-        url_open  = f'<a href="{item["url"]}" target="_blank" style="text-decoration:none;">' if item.get("url") else ''
-        url_close = '</a>' if item.get("url") else ''
-        cards_html += (
-            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
-            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};overflow:hidden;'
-            f'background:#1a1f2e;border:1px solid #263044;'
-            f'border-left:3px solid #00d4ff;border-radius:8px;">'
+        url_a = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
+        inner = (
+            f'<div style="padding:12px 16px;border-radius:10px;'
+            f'background:#0d1117;border-left:3px solid #00d4ff;">'
             f'<div style="color:#00d4ff;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">NEWS</div>'
-            f'{url_open}'
+            f'<a {url_a} style="text-decoration:none;">'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{item["title"]}</div>'
-            f'{url_close}'
+            f'</a>'
             f'<div style="color:#5a6a7e;font-size:12px;margin-top:2px">{item["source"]}</div>'
             f'</div>'
         )
+        cards_inner += f'<div style="margin-bottom:8px;">{inner}</div>'
         cards_added += 1
 
-    if not cards_html:
-        cards_html = (
-            f'<div style="height:{CARD_H};display:flex;flex-direction:column;'
-            f'justify-content:center;padding:0 16px;margin-bottom:{CARD_MB};'
-            f'background:#0a2010;border:1px solid #1a6640;'
-            f'border-left:3px solid #4caf50;border-radius:8px;">'
-            f'<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase">CLEAR</div>'
-            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">No Active Alerts</div>'
-            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">All ports below threshold</div>'
-            f'</div>'
+    if not cards_inner:
+        cards_inner = (
+            '<div style="padding:12px 16px;border-radius:10px;'
+            'background:#0a2010;border-left:3px solid #4caf50;">'
+            '<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase">CLEAR</div>'
+            '<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">No Active Alerts</div>'
+            '<div style="color:#8899a6;font-size:12px;margin-top:2px">All ports below threshold</div>'
+            '</div>'
         )
 
-    # Single HTML block — section headers + cards, no fixed outer height
+    # Two panel boxes, no fixed outer height — content flows naturally
+    PANEL = 'background:#1a1f2e;border:1px solid #263044;border-radius:14px;padding:18px;'
+    PTITLE = 'color:#e8eaed;font-size:15px;font-weight:700;margin-bottom:14px;'
     right_html = (
-        f'<div style="display:flex;flex-direction:column;">'
-        f'<div style="color:#a0aab4;font-size:11px;font-weight:600;'
-        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Top Congested Ports</div>'
-        + ports_html +
-        f'<div style="border-top:1px solid #1e2736;margin:14px 0;"></div>'
-        f'<div style="color:#a0aab4;font-size:11px;font-weight:600;'
-        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Live Alerts &amp; News</div>'
-        + cards_html +
+        f'<div style="{PANEL}margin-bottom:14px;">'
+        f'<div style="{PTITLE}">📍 Top Congested Ports</div>'
+        + ports_inner +
+        f'</div>'
+        f'<div style="{PANEL}">'
+        f'<div style="{PTITLE}">🔔 Live Alerts &amp; News</div>'
+        + cards_inner +
         f'</div>'
     )
     st.markdown(right_html, unsafe_allow_html=True)
