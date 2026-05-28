@@ -105,10 +105,10 @@ crit_color  = "#ef5350" if critical_n > 0 else "#4caf50"
 alert_color = "#ef5350" if alert_count > 3 else "#ffb74d" if alert_count > 0 else "#4caf50"
 
 c1, c2, c3, c4 = st.columns(4)
-c1.markdown(_kpi("Vessels Tracked",  f"{len(vessels):,}",       f"across {len(ports)} ports"),                                  unsafe_allow_html=True)
-c2.markdown(_kpi("Critical Ports",   str(critical_n),            f"{high_n} high risk",          crit_color,  "#ef5350" if critical_n > 0 else None),  unsafe_allow_html=True)
-c3.markdown(_kpi("Active Alerts",    str(alert_count),           f"${alert_cost:.0f}M exposure", alert_color, "#ef5350" if alert_count > 0 else None),  unsafe_allow_html=True)
-c4.markdown(_kpi("BDI",             str(bdi.get("value", "—")), f"{bdi_chg:+.1f}% · {bdi.get('trend','—').upper()}",          bdi_color),              unsafe_allow_html=True)
+c1.markdown(_kpi("Vessels Tracked",  f"{len(vessels):,}",       f"across {len(ports)} ports",       "#6b7fa3",   "#00d4ff"),              unsafe_allow_html=True)
+c2.markdown(_kpi("Critical Ports",   str(critical_n),            f"{high_n} high risk",            crit_color,  "#ef5350" if critical_n > 0 else "#4caf50"), unsafe_allow_html=True)
+c3.markdown(_kpi("Active Alerts",    str(alert_count),           f"${alert_cost:.0f}M exposure",   alert_color, "#ef5350" if alert_count > 0 else "#4caf50"), unsafe_allow_html=True)
+c4.markdown(_kpi("BDI",             str(bdi.get("value", "—")), f"{bdi_chg:+.1f}% · {bdi.get('trend','—').upper()}", bdi_color, bdi_color),            unsafe_allow_html=True)
 
 # ── Main content ───────────────────────────────────────────────────────
 # Map height and right-panel height are kept identical so both columns end together.
@@ -245,30 +245,19 @@ with right_col:
         )
 
     # Render entire right column as one block — no extra Streamlit element spacing
-    st.markdown(
-        f"""
-        <div style="height:{MAP_H}px;display:flex;flex-direction:column;overflow:hidden;">
-
-            <!-- Top half: congested ports -->
-            <div style="display:flex;flex-direction:column;">
-                <div style="color:#a0aab4;font-size:11px;font-weight:600;
-                            text-transform:uppercase;letter-spacing:.07em;
-                            margin-bottom:8px;">Top Congested Ports</div>
-                {ports_html}
-            </div>
-
-            <!-- Divider -->
-            <div style="border-top:1px solid #1e2736;margin:10px 0;flex-shrink:0;"></div>
-
-            <!-- Bottom half: alerts + news -->
-            <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
-                <div style="color:#a0aab4;font-size:11px;font-weight:600;
-                            text-transform:uppercase;letter-spacing:.07em;
-                            margin-bottom:8px;">Live Alerts &amp; News</div>
-                {cards_html}
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True,
+    right_html = (
+        f'<div style="height:{MAP_H}px;display:flex;flex-direction:column;overflow:hidden;">'
+        f'<div style="display:flex;flex-direction:column;">'
+        f'<div style="color:#a0aab4;font-size:11px;font-weight:600;'
+        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Top Congested Ports</div>'
+        + ports_html +
+        f'</div>'
+        f'<div style="border-top:1px solid #1e2736;margin:10px 0;flex-shrink:0;"></div>'
+        f'<div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">'
+        f'<div style="color:#a0aab4;font-size:11px;font-weight:600;'
+        f'text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Live Alerts &amp; News</div>'
+        + cards_html +
+        f'</div>'
+        f'</div>'
     )
+    st.markdown(right_html, unsafe_allow_html=True)
