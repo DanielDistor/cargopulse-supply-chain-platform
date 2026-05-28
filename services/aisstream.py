@@ -46,7 +46,7 @@ async def _fetch_snapshot(bounding_boxes: list, duration_seconds: int) -> list[d
     subscription = {
         "APIKey":             api_key,
         "BoundingBoxes":      bounding_boxes,
-        "FilterMessageTypes": ["PositionReport"],
+        "FilterMessageTypes": ["PositionReport", "ShipStaticData"],
     }
     vessels: dict[str, dict] = {}
     vessel_types: dict[str, int] = {}
@@ -118,7 +118,7 @@ def _run_fetch(bounding_boxes: list, duration_seconds: int) -> list[dict]:
             return []
 
 
-def get_vessels(bounding_boxes: list, duration_seconds: int = 5) -> list[dict]:
+def get_vessels(bounding_boxes: list, duration_seconds: int = 8) -> list[dict]:
     """
     Return a vessel snapshot from cache, or fetch a fresh one.
 
