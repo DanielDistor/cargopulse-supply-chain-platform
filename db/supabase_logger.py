@@ -1,220 +1,202 @@
 """
-Supabase logger — persists vessel activity snapshots to PostgreSQL.
+Supabase logger — persists vessel activity snapshots via the REST API.
 
-Each fresh AIS fetch writes one row (total vessel count + timestamp).
-The dashboard reads these rows to power two charts:
-  - Fleet Activity Last 7 Days  (daily average)
-  - Fleet Activity by Hour       (hourly average across all data)
+Uses httpx (already in requirements) over HTTPS instead of psycopg2/TCP,
+which avoids the IPv6 connectivity issue on Streamlit Cloud.
 
-Connection URL is read from:
-  1. SUPABASE_URL env var  (local .env)
-  2. st.secrets["SUPABASE_URL"]  (Streamlit Cloud)
-
-All functions are best-effort — any failure is silently swallowed so a
-DB outage never breaks the live vessel feed.
+Secrets needed in .env / Streamlit Cloud secrets:
+  SUPABASE_URL = "postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres"
+  SUPABASE_KEY = "<publishable key>"   # Settings → API Keys → Publishable key
 """
 import os
+import re
+from collections import defaultdict
+from datetime import datetime, timezone, timedelta
 
-_PSYCOPG2_OK = False
 try:
-    import psycopg2
-    _PSYCOPG2_OK = True
+    import httpx
+    _HTTPX_OK = True
 except ImportError:
-    pass
+    _HTTPX_OK = False
 
 
-def _url() -> str:
-    url = os.getenv("SUPABASE_URL", "").strip()
-    if url:
-        return url
+# ── Credential helpers ────────────────────────────────────────────────────────
+
+def _get_secret(key: str) -> str:
+    val = os.getenv(key, "").strip()
+    if val:
+        return val
     try:
         import streamlit as st
-        return st.secrets.get("SUPABASE_URL", "")
+        return st.secrets.get(key, "")
     except Exception:
         return ""
 
 
-def _connect():
-    """
-    Return a fresh psycopg2 connection, or None if unavailable.
-
-    Parses the URL manually so special characters in the password
-    (e.g. !, @, #) don't break the connection string parser.
-    """
-    if not _PSYCOPG2_OK:
-        return None
-    u = _url()
-    if not u:
-        return None
-    try:
-        import socket
-        from urllib.parse import urlparse, unquote
-        p    = urlparse(u)
-        host = p.hostname
-        port = p.port or 5432
-
-        # Streamlit Cloud can't connect via IPv6 — force an IPv4 address.
-        try:
-            ipv4 = socket.getaddrinfo(host, port, socket.AF_INET)
-            if ipv4:
-                host = ipv4[0][4][0]
-        except Exception:
-            pass  # no IPv4 found; try original hostname anyway
-
-        return psycopg2.connect(
-            host=host,
-            port=port,
-            dbname=(p.path or "/postgres").lstrip("/"),
-            user=p.username,
-            password=unquote(p.password or ""),
-            connect_timeout=10,
-            sslmode="require",
-        )
-    except Exception as e:
-        global _last_connect_error
-        _last_connect_error = str(e)
-        return None
+def _api_base() -> str:
+    """Derive REST base URL from the postgres connection string."""
+    url = _get_secret("SUPABASE_URL")
+    m = re.search(r'db\.([a-z0-9]+)\.supabase\.co', url)
+    return f"https://{m.group(1)}.supabase.co" if m else ""
 
 
-_last_connect_error: str = ""
+def _key() -> str:
+    return _get_secret("SUPABASE_KEY")
 
+
+def _headers() -> dict:
+    k = _key()
+    return {
+        "apikey":        k,
+        "Authorization": f"Bearer {k}",
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal",
+    }
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
 
 def test_connection() -> dict:
-    """Return a status dict for debugging. Safe to call from the UI."""
-    conn = _connect()
-    if conn:
-        conn.close()
-        return {"ok": True, "error": ""}
-    return {"ok": False, "error": _last_connect_error or "unknown",
-            "psycopg2": _PSYCOPG2_OK, "url_set": bool(_url())}
-
-
-def _ensure_table(conn) -> None:
-    """Create vessel_activity table + index if they don't exist yet."""
-    with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS vessel_activity (
-                id        SERIAL PRIMARY KEY,
-                logged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                total     INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS ix_vessel_activity_ts
-                ON vessel_activity (logged_at);
-        """)
-    conn.commit()
+    """Return a status dict. Safe to call from the UI."""
+    base = _api_base()
+    key  = _key()
+    if not _HTTPX_OK:
+        return {"ok": False, "error": "httpx not installed"}
+    if not base:
+        return {"ok": False, "error": "SUPABASE_URL not set or can't parse project ref"}
+    if not key:
+        return {"ok": False, "error": "SUPABASE_KEY not set"}
+    try:
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_activity",
+            headers=_headers(),
+            params={"select": "id", "limit": "1"},
+            timeout=5,
+        )
+        if r.status_code == 200:
+            return {"ok": True, "error": ""}
+        return {"ok": False, "error": f"HTTP {r.status_code}: {r.text[:200]}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def log_snapshot(total: int) -> None:
     """
-    Insert one snapshot row — but only if no row was written in the last 10 minutes.
-    Safe to call on every page load; deduplication is handled here, not in the caller.
+    Insert one row — skipped if a row already exists in the last 10 minutes.
+    Safe to call on every page load.
     """
-    conn = _connect()
-    if conn is None:
+    if not _HTTPX_OK:
+        return
+    base = _api_base()
+    key  = _key()
+    if not base or not key:
         return
     try:
-        _ensure_table(conn)
-        with conn.cursor() as cur:
-            # Conditional insert: skip if a row already exists within the last 10 min
-            cur.execute("""
-                INSERT INTO vessel_activity (total)
-                SELECT %s
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM vessel_activity
-                    WHERE logged_at > NOW() - INTERVAL '10 minutes'
-                )
-            """, (int(total),))
-        conn.commit()
+        since = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_activity",
+            headers=_headers(),
+            params={"select": "id", "logged_at": f"gte.{since}", "limit": "1"},
+            timeout=5,
+        )
+        if r.status_code == 200 and r.json():
+            return  # already logged recently — skip
+        httpx.post(
+            f"{base}/rest/v1/vessel_activity",
+            headers=_headers(),
+            json={"total": int(total)},
+            timeout=5,
+        )
     except Exception:
         pass
-    finally:
-        conn.close()
-
-
-def get_daily_activity(days: int = 7) -> list:
-    """
-    Returns up to `days` rows — one per calendar day — with the
-    average vessel count for that day.
-
-    Each row dict: {"day": datetime.date, "avg_total": float, "samples": int}
-    Returns [] if DB is unreachable or no data exists yet.
-    """
-    conn = _connect()
-    if conn is None:
-        return []
-    try:
-        _ensure_table(conn)
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    DATE(logged_at AT TIME ZONE 'UTC')  AS day,
-                    ROUND(AVG(total)::numeric, 1)       AS avg_total,
-                    COUNT(*)                            AS samples
-                FROM vessel_activity
-                WHERE logged_at > NOW() - INTERVAL %s
-                GROUP BY day
-                ORDER BY day
-            """, (f"{days} days",))
-            cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception:
-        return []
-    finally:
-        conn.close()
 
 
 def get_last_24h_activity() -> list:
     """
-    Returns individual snapshot rows from the last 24 hours, oldest first.
-    Each row dict: {"logged_at": datetime, "total": int}
-    Returns [] if DB is unreachable or no data exists yet.
+    Returns raw snapshot rows from the last 24 hours, oldest first.
+    Each row dict: {"logged_at": str, "total": int}
     """
-    conn = _connect()
-    if conn is None:
+    if not _HTTPX_OK:
+        return []
+    base = _api_base()
+    if not base or not _key():
         return []
     try:
-        _ensure_table(conn)
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT logged_at AT TIME ZONE 'UTC' AS logged_at, total
-                FROM vessel_activity
-                WHERE logged_at > NOW() - INTERVAL '24 hours'
-                ORDER BY logged_at
-            """)
-            cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+        since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_activity",
+            headers=_headers(),
+            params={"select": "logged_at,total",
+                    "logged_at": f"gte.{since}",
+                    "order": "logged_at.asc"},
+            timeout=10,
+        )
+        return r.json() if r.status_code == 200 else []
     except Exception:
         return []
-    finally:
-        conn.close()
+
+
+def get_daily_activity(days: int = 7) -> list:
+    """
+    Returns one row per calendar day for the last `days` days.
+    Each row dict: {"day": "2024-05-28", "avg_total": float, "samples": int}
+    """
+    if not _HTTPX_OK:
+        return []
+    base = _api_base()
+    if not base or not _key():
+        return []
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_activity",
+            headers=_headers(),
+            params={"select": "logged_at,total",
+                    "logged_at": f"gte.{since}",
+                    "order": "logged_at.asc",
+                    "limit": "10000"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return []
+        buckets: dict = defaultdict(list)
+        for row in r.json():
+            buckets[row["logged_at"][:10]].append(row["total"])
+        return [
+            {"day": day, "avg_total": round(sum(v) / len(v), 1), "samples": len(v)}
+            for day, v in sorted(buckets.items())
+        ]
+    except Exception:
+        return []
 
 
 def get_hourly_activity() -> list:
     """
-    Returns up to 24 rows — one per UTC hour — with the average
-    vessel count for that hour across all logged data.
-
+    Returns up to 24 rows, one per UTC hour, with average vessel count.
     Each row dict: {"hour": int, "avg_total": float, "samples": int}
-    Returns [] if DB is unreachable or no data exists yet.
     """
-    conn = _connect()
-    if conn is None:
+    if not _HTTPX_OK:
+        return []
+    base = _api_base()
+    if not base or not _key():
         return []
     try:
-        _ensure_table(conn)
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    EXTRACT(HOUR FROM logged_at AT TIME ZONE 'UTC')::int AS hour,
-                    ROUND(AVG(total)::numeric, 1)                        AS avg_total,
-                    COUNT(*)                                             AS samples
-                FROM vessel_activity
-                GROUP BY hour
-                ORDER BY hour
-            """)
-            cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_activity",
+            headers=_headers(),
+            params={"select": "logged_at,total",
+                    "order": "logged_at.asc",
+                    "limit": "10000"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return []
+        buckets: dict = defaultdict(list)
+        for row in r.json():
+            buckets[int(row["logged_at"][11:13])].append(row["total"])
+        return [
+            {"hour": h, "avg_total": round(sum(v) / len(v), 1), "samples": len(v)}
+            for h, v in sorted(buckets.items())
+        ]
     except Exception:
         return []
-    finally:
-        conn.close()
