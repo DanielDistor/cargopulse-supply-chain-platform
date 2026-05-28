@@ -50,7 +50,7 @@ def get_marine_weather(lat: float, lon: float) -> dict:
                     "wind_wave_height,ocean_current_velocity"
                 ),
             },
-            timeout=10,
+            timeout=5,
         )
         resp.raise_for_status()
         current = resp.json().get("current", {})

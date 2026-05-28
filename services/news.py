@@ -4,7 +4,7 @@ Maritime & supply chain news feed.
 Primary:  NewsAPI.org  (set NEWS_API_KEY in .env — free dev tier, 100 req/day)
 Fallback: RSS feeds from Hellenic Shipping News + Splash247  (no key required)
 
-Results are cached for 30 min via @st.cache_data to avoid hitting rate limits.
+Results are cached for 30 min in SQLite so they survive hot-reloads.
 """
 import os
 import re
@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from typing import TypedDict
 
 import httpx
-import streamlit as st
+from db import cache as db_cache
 
 
 class NewsItem(TypedDict):
@@ -36,17 +36,31 @@ _RSS_FEEDS = [
 
 _HEADERS = {"User-Agent": "CargoPulse/1.0 (supply chain intelligence platform)"}
 
+_CACHE_KEY = "maritime_news"
+_TTL = 30 * 60  # 30 minutes — survives hot-reloads unlike @st.cache_data
+
 
 # ── Public API ─────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=1800, show_spinner=False)
 def get_maritime_news(n: int = 4) -> list[NewsItem]:
     """Return up to *n* recent maritime news items."""
+    cached = db_cache.get(_CACHE_KEY, _TTL)
+    if cached:
+        return cached.get("items", [])[:n]
+
     api_key = os.getenv("NEWS_API_KEY", "").strip()
     items = _newsapi(api_key, n) if api_key else []
     if not items:
         items = _rss_fallback(n)
-    return items[:n]
+
+    if items:
+        # Cache up to 8 so callers can slice without re-fetching
+        db_cache.set(_CACHE_KEY, {"items": items[:8]})
+        return items[:n]
+
+    # Network failed — serve stale rather than blank
+    stale = db_cache.get_stale(_CACHE_KEY)
+    return stale.get("items", [])[:n] if stale else []
 
 
 # ── Providers ──────────────────────────────────────────────────────────

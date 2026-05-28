@@ -8,6 +8,7 @@ No approximations. Content/data substituted; design tokens unchanged.
 """
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -35,11 +36,18 @@ with open(PORTS_PATH) as f:
 
 bounding_boxes = [aisstream.make_port_bounding_box(p["lat"], p["lon"]) for p in ports]
 
-# ── Load data ──────────────────────────────────────────────────────────
+# ── Load data (parallel fetch) ─────────────────────────────────────────
+# AIS, BDI, and news are independent — fetch concurrently.
+# Congestion needs vessels first, but its 50 weather calls are also parallelised internally.
 with st.spinner("Loading live intelligence feeds..."):
-    vessels         = aisstream.get_vessels(bounding_boxes)
+    with ThreadPoolExecutor(max_workers=3) as _ex:
+        _v = _ex.submit(aisstream.get_vessels, bounding_boxes)
+        _b = _ex.submit(get_bdi)
+        _n = _ex.submit(get_maritime_news, 3)
+        vessels    = _v.result()
+        bdi        = _b.result()
+        news_items = _n.result()
     congestion_data = cong_svc.get_all_port_congestion(vessels)
-    bdi             = get_bdi()
 
 df_cong    = pd.DataFrame(congestion_data).sort_values("score", ascending=False) if congestion_data else pd.DataFrame()
 vessel_age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
@@ -361,7 +369,7 @@ with right_col:
             '</div>'
         )
 
-    for item in get_maritime_news(n=3 - len(alert_cards)):
+    for item in news_items[:3 - len(alert_cards)]:
         if len(alert_cards) >= 3:
             break
         url_a = 'href="' + item["url"] + '" target="_blank"' if item.get("url") else ""

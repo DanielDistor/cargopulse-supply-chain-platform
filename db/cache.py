@@ -11,7 +11,7 @@ def _db_path() -> str:
 
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(_db_path())
+    conn = sqlite3.connect(_db_path(), timeout=10)  # wait up to 10s for write lock
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS cache (

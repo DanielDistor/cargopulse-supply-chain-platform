@@ -1,11 +1,13 @@
 import json
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor
 from db import cache
 from services import weather as weather_svc
 
 TTL = 15 * 60  # 15 minutes
 PORTS_PATH = os.path.join(os.path.dirname(__file__), "..", "db", "ports.json")
+CONGESTION_CACHE_KEY = "all_port_congestion"
 
 
 def load_ports() -> list[dict]:
@@ -73,25 +75,24 @@ def congestion_color(score: int) -> str:
 def get_all_port_congestion(vessels: list[dict]) -> list[dict]:
     """
     Score every port. Returns list sorted by score descending.
-    Each entry is cached individually for 15 minutes.
+
+    Warm path:  one SQLite read  (~ms)
+    Cold path:  all 50 weather fetches run in parallel (10 workers),
+                then whole result is cached for 15 minutes.
     """
+    cached = cache.get(CONGESTION_CACHE_KEY, TTL)
+    if cached:
+        return cached.get("data", [])
+
     ports = load_ports()
-    results = []
 
-    for port in ports:
-        cache_key = f"cong_{port['name'].lower().replace(' ', '_')}"
-        cached = cache.get(cache_key, TTL)
-        if cached:
-            results.append(cached)
-            continue
-
+    def _score_port(port: dict) -> dict:
         vessel_count = count_vessels_near_port(vessels, port["lat"], port["lon"])
         w = weather_svc.get_marine_weather(port["lat"], port["lon"])
         score = compute_congestion_score(
             vessel_count, port["capacity_baseline"], w.get("wave_height_m")
         )
-
-        entry = {
+        return {
             "name": port["name"],
             "country": port["country"],
             "region": port["region"],
@@ -104,7 +105,10 @@ def get_all_port_congestion(vessels: list[dict]) -> list[dict]:
             "color": congestion_color(score),
             "wave_height_m": w.get("wave_height_m"),
         }
-        cache.set(cache_key, entry)
-        results.append(entry)
 
-    return sorted(results, key=lambda x: x["score"], reverse=True)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(_score_port, ports))
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    cache.set(CONGESTION_CACHE_KEY, {"data": results})
+    return results
