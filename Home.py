@@ -6,6 +6,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc
 from services.shipping_rates import get_bdi
+from services.news import get_maritime_news
 from db import cache
 from components.styles import inject_global_css, navbar
 
@@ -45,34 +46,44 @@ alert_cost  = round(sum(
 ), 0) if not df_cong.empty else 0
 bdi_chg     = bdi.get("change_pct_1d") or 0
 
-# ── Status bar ─────────────────────────────────────────────────────────
+# ── Page header ────────────────────────────────────────────────────────
 is_connected = vessel_age is not None
 is_live      = is_connected and vessel_age < 900
-age_str      = f"{vessel_age // 60}m {vessel_age % 60}s ago" if vessel_age else "fetching..."
-conn_color   = "#4caf50" if is_connected else "#ef5350"
-live_color   = "#4caf50" if is_live else "#ffb74d"
+age_str      = f"{vessel_age // 60}m {vessel_age % 60}s ago" if vessel_age else "fetching…"
+
+if is_live:
+    status_label, status_color = "System Operational", "#4caf50"
+elif is_connected:
+    status_label, status_color = "Data Stale",         "#ffb74d"
+else:
+    status_label, status_color = "Offline",            "#ef5350"
 
 st.markdown(
-    f'<div style="display:flex;justify-content:space-between;align-items:center;'
-    f'padding:7px 14px;background:#1a1f2e;border:1px solid #263044;'
-    f'border-radius:8px;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-    f'<div style="display:flex;gap:20px;flex-wrap:wrap;">'
-    f'<span style="color:#5a6a7e;font-size:12px">AIS · <b style="color:#a0aab4">{age_str}</b></span>'
-    f'<span style="color:#5a6a7e;font-size:12px">Weather · <b style="color:#a0aab4">Open-Meteo (3h cache)</b></span>'
-    f'<span style="color:#5a6a7e;font-size:12px">BDI · <b style="color:#a0aab4">{bdi.get("value","N/A")} ({bdi.get("trend","N/A")})</b></span>'
-    f'<span style="color:#5a6a7e;font-size:12px">Ports · <b style="color:#a0aab4">{len(ports)}</b></span>'
-    f'</div>'
-    f'<div style="display:flex;gap:14px;align-items:center;">'
-    f'<div style="display:flex;align-items:center;gap:5px;">'
-    f'<div style="width:7px;height:7px;border-radius:50%;background:{conn_color};box-shadow:0 0 5px {conn_color}"></div>'
-    f'<span style="color:#a0aab4;font-size:12px">Connected</span>'
-    f'</div>'
-    f'<div style="display:flex;align-items:center;gap:5px;">'
-    f'<div style="width:7px;height:7px;border-radius:50%;background:{live_color};box-shadow:0 0 5px {live_color}"></div>'
-    f'<span style="color:#a0aab4;font-size:12px">Live</span>'
-    f'</div>'
-    f'</div>'
-    f'</div>',
+    f"""
+    <div style="display:flex;justify-content:space-between;align-items:center;
+                margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #1e2736;">
+        <div>
+            <div style="color:#e8eaed;font-size:22px;font-weight:800;letter-spacing:-0.02em;
+                        line-height:1.2">Supply Chain Intelligence</div>
+            <div style="color:#5a6a7e;font-size:13px;margin-top:3px">
+                Live port congestion &nbsp;·&nbsp; vessel tracking
+                &nbsp;·&nbsp; BDI freight analysis &nbsp;·&nbsp; {len(ports)} ports monitored
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
+            <span style="color:#5a6a7e;font-size:12px">🕐 Last sync: <b style="color:#a0aab4">{age_str}</b></span>
+            <div style="background:{status_color}18;border:1px solid {status_color}55;
+                        border-radius:20px;padding:5px 14px;
+                        display:flex;align-items:center;gap:6px;">
+                <div style="width:7px;height:7px;border-radius:50%;
+                            background:{status_color};box-shadow:0 0 5px {status_color}"></div>
+                <span style="color:{status_color};font-size:12px;font-weight:600">
+                    {status_label}
+                </span>
+            </div>
+        </div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
@@ -184,33 +195,69 @@ with right_col:
 
     st.markdown('<div style="height:14px;"></div>', unsafe_allow_html=True)
 
-    # ── Live Alerts ───────────────────────────────────────────────────
+    # ── Live Alerts + News ────────────────────────────────────────────
     st.markdown(
         '<div style="color:#e8eaed;font-size:13px;font-weight:600;margin-bottom:8px;">'
-        'Live Alerts</div>',
+        'Live Alerts &amp; News</div>',
         unsafe_allow_html=True,
     )
 
+    # Congestion-based alerts first
     alerts: list[tuple] = []
     if not df_cong.empty:
-        for _, row in df_cong[df_cong["score"] >= 60].head(3).iterrows():
+        for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
             sev   = "CRITICAL" if row["score"] >= 86 else "HIGH"
             color = "#b71c1c"  if sev == "CRITICAL"  else "#ef5350"
             alerts.append((sev, row["name"], f"Congestion {row['score']}/100 · {row['vessel_count']} vessels nearby", color))
     if bdi.get("trend") == "rising":
         alerts.append(("WATCH", "Rising BDI — Freight Pressure", f"Index {bdi.get('value','N/A')} · {bdi_chg:+.1f}% today", "#ffb74d"))
-    if not alerts:
-        alerts.append(("CLEAR", "No Active Alerts", "All monitored ports are below risk threshold", "#4caf50"))
 
-    for sev, title, body, color in alerts[:4]:
+    for sev, title, body, color in alerts[:3]:
         st.markdown(
             f'<div style="background:{color}18;border:1px solid {color}44;'
             f'border-left:3px solid {color};border-radius:0 8px 8px 0;'
-            f'padding:10px 12px;margin-bottom:6px;">'
+            f'padding:9px 12px;margin-bottom:5px;">'
             f'<div style="color:{color};font-size:10px;font-weight:700;'
-            f'text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">{sev}</div>'
-            f'<div style="color:#e8eaed;font-size:13px;font-weight:600">{title}</div>'
-            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">{body}</div>'
+            f'text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">{sev}</div>'
+            f'<div style="color:#e8eaed;font-size:13px;font-weight:600;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{title}</div>'
+            f'<div style="color:#6b7fa3;font-size:12px;margin-top:1px">{body}</div>'
             f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # News headlines
+    news_items = get_maritime_news(n=3)
+    for item in news_items:
+        url_attr = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
+        title_html = (
+            f'<a {url_attr} style="color:#e8eaed;font-size:13px;font-weight:600;'
+            f'text-decoration:none;display:block;white-space:nowrap;overflow:hidden;'
+            f'text-overflow:ellipsis;">{item["title"]}</a>'
+            if url_attr else
+            f'<div style="color:#e8eaed;font-size:13px;font-weight:600;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{item["title"]}</div>'
+        )
+        st.markdown(
+            f'<div style="background:#1a1f2e;border:1px solid #263044;'
+            f'border-left:3px solid #00d4ff;border-radius:0 8px 8px 0;'
+            f'padding:9px 12px;margin-bottom:5px;">'
+            f'<div style="color:#00d4ff;font-size:10px;font-weight:700;'
+            f'text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">NEWS</div>'
+            f'{title_html}'
+            f'<div style="color:#5a6a7e;font-size:11px;margin-top:2px">{item["source"]}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    if not alerts and not news_items:
+        st.markdown(
+            '<div style="background:#0a2010;border:1px solid #1a6640;border-left:3px solid #4caf50;'
+            'border-radius:0 8px 8px 0;padding:10px 12px;">'
+            '<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:.06em;margin-bottom:2px">CLEAR</div>'
+            '<div style="color:#e8eaed;font-size:13px;font-weight:600">No Active Alerts</div>'
+            '<div style="color:#6b7fa3;font-size:12px;margin-top:1px">All ports below threshold</div>'
+            '</div>',
             unsafe_allow_html=True,
         )
