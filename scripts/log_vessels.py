@@ -2,8 +2,9 @@
 Standalone vessel logger for GitHub Actions.
 
 Fetches a 15-second AIS snapshot across all configured ports,
-counts vessels with valid coordinates, and logs the total to Supabase.
-Runs outside Streamlit — no st.secrets, no cache layer.
+counts vessels with valid coordinates, logs the total to Supabase
+(vessel_activity), and upserts individual MMSIs for the day
+(vessel_daily) so the 7-day chart shows true distinct vessel counts.
 """
 import asyncio
 import json
@@ -30,11 +31,12 @@ def _bounding_box(lat: float, lon: float, radius: float = 0.5) -> list:
     return [[lat - radius, lon - radius], [lat + radius, lon + radius]]
 
 
-async def _fetch(duration: int) -> int:
+async def _fetch(duration: int) -> tuple[int, list[str]]:
+    """Returns (vessel_count, list_of_mmsis)."""
     api_key = os.getenv("AISSTREAM_API_KEY", "")
     if not api_key:
         print("ERROR: AISSTREAM_API_KEY not set")
-        return 0
+        return 0, []
 
     with open(PORTS_PATH) as f:
         ports = json.load(f)
@@ -71,16 +73,20 @@ async def _fetch(duration: int) -> int:
     except Exception as e:
         print(f"AIS fetch error: {e}")
 
-    return len(vessels)
+    mmsis = list(vessels.keys())
+    return len(mmsis), mmsis
 
 
 def main() -> None:
-    count = asyncio.run(_fetch(FETCH_SECONDS))
+    count, mmsis = asyncio.run(_fetch(FETCH_SECONDS))
     print(f"Vessel count: {count}")
 
     if count > 0:
         supabase_logger.log_snapshot(count)
-        print("Logged to Supabase ✓")
+        print("Logged snapshot to vessel_activity ✓")
+
+        supabase_logger.log_vessel_mmsis(mmsis)
+        print(f"Upserted {len(mmsis)} MMSIs to vessel_daily ✓")
     else:
         print("No vessels found — skipping log")
 

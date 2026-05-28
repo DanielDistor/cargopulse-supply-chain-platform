@@ -7,6 +7,10 @@ which avoids the IPv6 connectivity issue on Streamlit Cloud.
 Secrets needed in .env / Streamlit Cloud secrets:
   SUPABASE_URL = "postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres"
   SUPABASE_KEY = "<publishable key>"   # Settings → API Keys → Publishable key
+
+Tables:
+  vessel_activity (id, logged_at, total)  — snapshot totals for 24h chart
+  vessel_daily    (mmsi, day)             — distinct vessels per day for 7-day chart
 """
 import os
 import re
@@ -44,14 +48,17 @@ def _key() -> str:
     return _get_secret("SUPABASE_KEY")
 
 
-def _headers() -> dict:
+def _headers(extra: dict | None = None) -> dict:
     k = _key()
-    return {
+    h = {
         "apikey":        k,
         "Authorization": f"Bearer {k}",
         "Content-Type":  "application/json",
         "Prefer":        "return=minimal",
     }
+    if extra:
+        h.update(extra)
+    return h
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -82,8 +89,9 @@ def test_connection() -> dict:
 
 def log_snapshot(total: int) -> None:
     """
-    Insert one row per page load, but skip if a row was already written
-    in the last 60 seconds (guards against rapid refresh spam).
+    Insert one row into vessel_activity per page load.
+    Skips if a row was already written in the last 60 seconds
+    (guards against rapid refresh spam).
     """
     if not _HTTPX_OK:
         return
@@ -111,6 +119,73 @@ def log_snapshot(total: int) -> None:
         pass
 
 
+def log_vessel_mmsis(mmsis: list) -> None:
+    """
+    Upsert vessel MMSIs seen today into vessel_daily.
+    Primary key is (mmsi, day) so duplicates within a day are ignored —
+    each vessel is counted only once per calendar day regardless of how
+    many snapshots it appears in.
+    """
+    if not _HTTPX_OK or not mmsis:
+        return
+    base = _api_base()
+    if not base or not _key():
+        return
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    rows  = [{"mmsi": str(m), "day": today} for m in mmsis if m]
+    if not rows:
+        return
+    try:
+        # Send in batches of 500 to stay within request size limits
+        batch_size = 500
+        hdrs = _headers({"Prefer": "resolution=ignore-duplicates,return=minimal"})
+        for i in range(0, len(rows), batch_size):
+            httpx.post(
+                f"{base}/rest/v1/vessel_daily",
+                headers=hdrs,
+                json=rows[i : i + batch_size],
+                timeout=15,
+            )
+    except Exception:
+        pass
+
+
+def get_daily_distinct_vessels(days: int = 7) -> list:
+    """
+    Returns one row per calendar day: count of distinct vessels seen that day.
+    Each row dict: {"day": "2024-05-28", "vessel_count": int}
+
+    Reads from vessel_daily where each (mmsi, day) pair is unique,
+    so this is a true distinct-vessel count — not a snapshot average.
+    """
+    if not _HTTPX_OK:
+        return []
+    base = _api_base()
+    if not base or not _key():
+        return []
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_daily",
+            headers=_headers(),
+            params={"select": "day",
+                    "day":    f"gte.{since}",
+                    "limit":  "50000"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return []
+        buckets: dict = defaultdict(int)
+        for row in r.json():
+            buckets[row["day"]] += 1
+        return [
+            {"day": day, "vessel_count": count}
+            for day, count in sorted(buckets.items())
+        ]
+    except Exception:
+        return []
+
+
 def get_last_24h_activity() -> list:
     """
     Returns raw snapshot rows from the last 24 hours, oldest first.
@@ -132,40 +207,6 @@ def get_last_24h_activity() -> list:
             timeout=10,
         )
         return r.json() if r.status_code == 200 else []
-    except Exception:
-        return []
-
-
-def get_daily_activity(days: int = 7) -> list:
-    """
-    Returns one row per calendar day for the last `days` days.
-    Each row dict: {"day": "2024-05-28", "avg_total": float, "samples": int}
-    """
-    if not _HTTPX_OK:
-        return []
-    base = _api_base()
-    if not base or not _key():
-        return []
-    try:
-        since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        r = httpx.get(
-            f"{base}/rest/v1/vessel_activity",
-            headers=_headers(),
-            params={"select": "logged_at,total",
-                    "logged_at": f"gte.{since}",
-                    "order": "logged_at.asc",
-                    "limit": "10000"},
-            timeout=10,
-        )
-        if r.status_code != 200:
-            return []
-        buckets: dict = defaultdict(list)
-        for row in r.json():
-            buckets[row["logged_at"][:10]].append(row["total"])
-        return [
-            {"day": day, "avg_total": round(sum(v) / len(v), 1), "samples": len(v)}
-            for day, v in sorted(buckets.items())
-        ]
     except Exception:
         return []
 

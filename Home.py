@@ -52,12 +52,13 @@ vessel_age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 # Count only vessels with valid coordinates (consistent with Vessel Tracking page)
 vessel_count = sum(1 for v in (vessels or []) if v.get("lat") is not None and v.get("lon") is not None)
 
-# Log to Supabase on every page load — log_snapshot() deduplicates internally
-# (skips insert if a row was already written in the last 10 minutes).
+# Log to Supabase on every page load.
 # Must stay in the main Streamlit thread; st.secrets fails in background threads.
 if vessel_count > 0:
     try:
         supabase_logger.log_snapshot(vessel_count)
+        mmsis = [v["mmsi"] for v in (vessels or []) if v.get("mmsi") and v.get("lat") is not None]
+        supabase_logger.log_vessel_mmsis(mmsis)
     except Exception:
         pass
 
@@ -143,7 +144,7 @@ c4.markdown(_kpi("BDI",             bdi_display,                 f"{bdi_chg:+.1f
 st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
 # ── Fleet Activity Cards ────────────────────────────────────────────────
-_daily  = supabase_logger.get_daily_activity(7)
+_daily  = supabase_logger.get_daily_distinct_vessels(7)
 _h24    = supabase_logger.get_last_24h_activity()
 
 _CF = dict(family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
@@ -173,12 +174,12 @@ with _ac_left:
     if _daily:
         _fig7 = go.Figure(go.Scatter(
             x=[str(r["day"]) for r in _daily],
-            y=[float(r["avg_total"]) for r in _daily],
+            y=[int(r["vessel_count"]) for r in _daily],
             mode="lines+markers",
             line=dict(color="#3b82f6", width=2.5),
             marker=dict(color="#3b82f6", size=5),
             fill="tozeroy", fillcolor="rgba(59,130,246,0.08)",
-            hovertemplate="%{x}<br><b>%{y:.0f} vessels</b><extra></extra>",
+            hovertemplate="%{x}<br><b>%{y} vessels</b><extra></extra>",
         ))
         _fig7.update_layout(
             **{k: v for k, v in _CL.items() if k != "xaxis"},
