@@ -43,7 +43,7 @@ df_cong    = pd.DataFrame(congestion_data).sort_values("score", ascending=False)
 vessel_age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 
 # Count only vessels with valid coordinates (consistent with Vessel Tracking page)
-vessel_count = int(pd.DataFrame(vessels).dropna(subset=["lat", "lon"]).shape[0]) if vessels else 0
+vessel_count = sum(1 for v in (vessels or []) if v.get("lat") is not None and v.get("lon") is not None)
 
 critical_n  = int((df_cong["score"] >= 86).sum()) if not df_cong.empty else 0
 high_n      = int(((df_cong["score"] >= 61) & (df_cong["score"] < 86)).sum()) if not df_cong.empty else 0
