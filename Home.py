@@ -165,55 +165,55 @@ with map_col:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# ── Right: two panel boxes (like reference) ────────────────────────────
+# ── Right: two panel boxes — flex gap controls ALL spacing uniformly ───
 with right_col:
-    # Row style — sits inside a panel, slightly darker background
-    def _row(content: str, mb: bool = True) -> str:
-        m = "margin-bottom:12px;" if mb else ""
-        return f'<div style="background:#0d1117;border-radius:10px;{m}">{content}</div>'
+    # One gap value used everywhere: between title→card and card→card.
+    # No individual margin-bottom anywhere — that was the unevenness.
+    GAP = "10px"
+    PANEL = (
+        f'background:#1a1f2e;border:1px solid #263044;border-radius:14px;'
+        f'padding:16px;display:flex;flex-direction:column;gap:{GAP};'
+    )
+    TITLE = 'color:#e8eaed;font-size:15px;font-weight:700;'
 
-    # ── Panel 1: Top Congested Ports ───────────────────────────────────
-    port_rows = df_cong.head(2)
-    ports_inner = ""
-    for i, (_, row) in enumerate(port_rows.iterrows()):
+    # ── Port rows ───────────────────────────────────────────────────────
+    port_html = ""
+    for _, row in df_cong.head(2).iterrows():
         lc = LC.get(row.get("label", ""), "#a0aab4")
-        last = (i == len(port_rows) - 1)
-        inner = (
-            f'<div style="display:flex;align-items:center;padding:12px 16px;'
-            f'border-radius:10px;border-left:3px solid {lc};">'
+        port_html += (
+            f'<div style="background:#0d1117;border-radius:10px;padding:14px 16px;'
+            f'display:flex;align-items:center;border-left:3px solid {lc};">'
             f'<div style="flex:1;min-width:0;">'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
             f'<div style="color:#5a6a7e;font-size:12px;margin-top:4px">'
             f'{row["country"]} · {row["vessel_count"]} vessels</div>'
             f'</div>'
-            f'<div style="flex-shrink:0;margin-left:12px;text-align:right;">'
+            f'<div style="flex-shrink:0;margin-left:12px;">'
             f'<span style="color:{lc};font-size:22px;font-weight:800">{row["score"]}</span>'
             f'<span style="color:#5a6a7e;font-size:11px"> /100</span>'
             f'</div>'
             f'</div>'
         )
-        ports_inner += _row(inner, mb=not last)
-    if not ports_inner:
-        ports_inner = _row(
-            '<div style="padding:12px 16px;color:#5a6a7e;font-size:13px">No data yet</div>',
-            mb=False,
+    if not port_html:
+        port_html = (
+            '<div style="background:#0d1117;border-radius:10px;padding:14px 16px;'
+            'color:#5a6a7e;font-size:13px">No congestion data yet</div>'
         )
 
-    # ── Panel 2: Live Alerts & News ────────────────────────────────────
-    # Collect card HTML into a list so we can apply 12px gap only between
-    # cards (not after the last one) — prevents bottom-of-panel overlap.
-    card_list: list[str] = []
+    # ── Alert / news cards ──────────────────────────────────────────────
+    alert_html = ""
+    n_cards = 0
 
     for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
-        if len(card_list) >= 3:
+        if n_cards >= 3:
             break
         sev   = "CRITICAL" if row["score"] >= 86 else "HIGH"
-        color = "#c62828"  if sev == "CRITICAL"  else "#ef5350"
-        card_list.append(
-            f'<div style="padding:12px 16px;border-radius:10px;'
-            f'background:{color}22;border-left:3px solid {color};">'
-            f'<div style="color:{color};font-size:10px;font-weight:700;'
+        col   = "#c62828"  if sev == "CRITICAL"  else "#ef5350"
+        alert_html += (
+            f'<div style="background:{col}1a;border-radius:10px;padding:12px 16px;'
+            f'border-left:3px solid {col};">'
+            f'<div style="color:{col};font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">{sev}</div>'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
@@ -221,63 +221,59 @@ with right_col:
             f'Congestion {row["score"]}/100 · {row["vessel_count"]} vessels nearby</div>'
             f'</div>'
         )
+        n_cards += 1
 
-    if bdi.get("trend") == "rising" and len(card_list) < 3:
-        card_list.append(
-            f'<div style="padding:12px 16px;border-radius:10px;'
-            f'background:#ffb74d22;border-left:3px solid #ffb74d;">'
-            f'<div style="color:#ffb74d;font-size:10px;font-weight:700;'
-            f'text-transform:uppercase;letter-spacing:.06em">WATCH</div>'
+    if bdi.get("trend") == "rising" and n_cards < 3:
+        alert_html += (
+            '<div style="background:#ffb74d1a;border-radius:10px;padding:12px 16px;'
+            'border-left:3px solid #ffb74d;">'
+            '<div style="color:#ffb74d;font-size:10px;font-weight:700;'
+            'text-transform:uppercase;letter-spacing:.06em">WATCH</div>'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">Rising BDI</div>'
             f'<div style="color:#8899a6;font-size:12px;margin-top:2px">'
             f'Index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
-            f'</div>'
+            '</div>'
         )
+        n_cards += 1
 
-    for item in get_maritime_news(n=3 - len(card_list)):
-        if len(card_list) >= 3:
+    for item in get_maritime_news(n=3 - n_cards):
+        if n_cards >= 3:
             break
         url_a = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
-        card_list.append(
-            f'<div style="padding:12px 16px;border-radius:10px;'
-            f'background:#131920;border-left:3px solid #00d4ff;">'
-            f'<div style="color:#00d4ff;font-size:10px;font-weight:700;'
-            f'text-transform:uppercase;letter-spacing:.06em">NEWS</div>'
+        alert_html += (
+            '<div style="background:#131a24;border-radius:10px;padding:12px 16px;'
+            'border-left:3px solid #00d4ff;">'
+            '<div style="color:#00d4ff;font-size:10px;font-weight:700;'
+            'text-transform:uppercase;letter-spacing:.06em">NEWS</div>'
             f'<a {url_a} style="text-decoration:none;">'
             f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{item["title"]}</div>'
-            f'</a>'
+            '</a>'
             f'<div style="color:#5a6a7e;font-size:12px;margin-top:2px">{item["source"]}</div>'
-            f'</div>'
+            '</div>'
         )
+        n_cards += 1
 
-    # Render: 12px gap between cards, nothing after the last one
-    cards_inner = ""
-    for i, card in enumerate(card_list):
-        mb = "" if i == len(card_list) - 1 else "margin-bottom:12px;"
-        cards_inner += f'<div style="{mb}">{card}</div>'
-
-    if not cards_inner:
-        cards_inner = (
-            '<div style="padding:12px 16px;border-radius:10px;'
-            'background:#0a2010;border-left:3px solid #4caf50;">'
+    if not alert_html:
+        alert_html = (
+            '<div style="background:#0a20101a;border-radius:10px;padding:12px 16px;'
+            'border-left:3px solid #4caf50;">'
             '<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase">CLEAR</div>'
             '<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">No Active Alerts</div>'
             '<div style="color:#8899a6;font-size:12px;margin-top:2px">All ports below threshold</div>'
             '</div>'
         )
 
-    # Two panel boxes, no fixed outer height — content flows naturally
-    PANEL = 'background:#1a1f2e;border:1px solid #263044;border-radius:14px;padding:18px;'
-    PTITLE = 'color:#e8eaed;font-size:15px;font-weight:700;margin-bottom:14px;'
+    # Panels: flex column with gap={GAP} handles title→card and card→card spacing.
+    # The SAME gap value everywhere = perfectly uniform margins throughout.
     right_html = (
-        f'<div style="{PANEL}margin-bottom:14px;">'
-        f'<div style="{PTITLE}">📍 Top Congested Ports</div>'
-        + ports_inner +
+        f'<div style="{PANEL}margin-bottom:{GAP};">'
+        f'<div style="{TITLE}">📍 Top Congested Ports</div>'
+        + port_html +
         f'</div>'
         f'<div style="{PANEL}">'
-        f'<div style="{PTITLE}">🔔 Live Alerts &amp; News</div>'
-        + cards_inner +
+        f'<div style="{TITLE}">🔔 Live Alerts &amp; News</div>'
+        + alert_html +
         f'</div>'
     )
     st.markdown(right_html, unsafe_allow_html=True)
