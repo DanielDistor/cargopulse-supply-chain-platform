@@ -7,8 +7,8 @@ def inject_global_css() -> None:
         <style>
         /* ── Page chrome ── */
         .stApp { background-color: #0f1117; }
-        header[data-testid="stHeader"] { background-color: #0f1117; border-bottom: none; }
-        .block-container { padding-top: 1.5rem !important; padding-bottom: 3rem !important; }
+        header[data-testid="stHeader"] { display: none !important; }
+        .block-container { padding-top: 0.5rem !important; padding-bottom: 3rem !important; }
 
         /* ── Hide sidebar and its toggle button entirely ── */
         [data-testid="stSidebar"]       { display: none !important; }
