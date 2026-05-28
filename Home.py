@@ -166,80 +166,89 @@ with map_col:
 
 # ── Right: ports + alerts in one fixed-height HTML block ───────────────
 with right_col:
-    # Build ports HTML (top 3)
+    # Build ports HTML (top 2 only — keeps right panel from overflowing)
     ports_html = ""
-    for _, row in df_cong.head(3).iterrows():
+    for _, row in df_cong.head(2).iterrows():
         lc = LC.get(row.get("label", ""), "#a0aab4")
         ports_html += (
-            f'<div style="display:flex;align-items:center;padding:11px 14px;margin-bottom:6px;'
+            f'<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:8px;'
             f'background:#1a1f2e;border-radius:8px;border:1px solid #263044;border-left:3px solid {lc};">'
             f'<div style="flex:1;min-width:0;">'
-            f'  <div style="color:#e8eaed;font-size:14px;font-weight:600;'
-            f'       white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-            f'  <div style="color:#5a6a7e;font-size:12px;margin-top:2px">{row["country"]} · {row["vessel_count"]} vessels</div>'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
+            f'<div style="color:#5a6a7e;font-size:12px;margin-top:3px">{row["country"]} · {row["vessel_count"]} vessels</div>'
             f'</div>'
             f'<div style="text-align:right;flex-shrink:0;margin-left:12px;">'
-            f'  <span style="color:{lc};font-size:18px;font-weight:800">{row["score"]}</span>'
-            f'  <span style="color:#5a6a7e;font-size:11px"> /100</span>'
+            f'<span style="color:{lc};font-size:20px;font-weight:800">{row["score"]}</span>'
+            f'<span style="color:#5a6a7e;font-size:11px"> /100</span>'
             f'</div>'
             f'</div>'
         )
 
-    # Build alerts + news HTML (max 3 total)
+    # Build alerts + news HTML — hard cap at 3 cards total so nothing overflows
     cards_html = ""
+    cards_added = 0
 
     for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
+        if cards_added >= 3:
+            break
         sev   = "CRITICAL" if row["score"] >= 86 else "HIGH"
         color = "#b71c1c"  if sev == "CRITICAL"  else "#ef5350"
         cards_html += (
             f'<div style="background:{color}18;border:1px solid {color}44;'
             f'border-left:3px solid {color};border-radius:0 8px 8px 0;'
-            f'padding:10px 14px;margin-bottom:6px;">'
+            f'padding:11px 14px;margin-bottom:8px;">'
             f'<div style="color:{color};font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">{sev}</div>'
-            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px;'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
             f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">'
             f'Congestion {row["score"]}/100 · {row["vessel_count"]} vessels nearby</div>'
             f'</div>'
         )
+        cards_added += 1
 
-    if bdi.get("trend") == "rising":
+    if bdi.get("trend") == "rising" and cards_added < 3:
         cards_html += (
             f'<div style="background:#ffb74d18;border:1px solid #ffb74d44;'
             f'border-left:3px solid #ffb74d;border-radius:0 8px 8px 0;'
-            f'padding:10px 14px;margin-bottom:6px;">'
+            f'padding:11px 14px;margin-bottom:8px;">'
             f'<div style="color:#ffb74d;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">WATCH</div>'
-            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px">Rising BDI</div>'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">Rising BDI</div>'
             f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">'
             f'Index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
             f'</div>'
         )
+        cards_added += 1
 
-    for item in get_maritime_news(n=3):
+    news_slots = 3 - cards_added
+    for item in get_maritime_news(n=news_slots):
+        if cards_added >= 3:
+            break
         url_open  = f'<a href="{item["url"]}" target="_blank" style="text-decoration:none;display:block">' if item.get("url") else '<div>'
         url_close = '</a>' if item.get("url") else '</div>'
         cards_html += (
             f'<div style="background:#1a1f2e;border:1px solid #263044;'
             f'border-left:3px solid #00d4ff;border-radius:0 8px 8px 0;'
-            f'padding:10px 14px;margin-bottom:6px;">'
+            f'padding:11px 14px;margin-bottom:8px;">'
             f'<div style="color:#00d4ff;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">NEWS</div>'
             f'{url_open}'
-            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px;'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{item["title"]}</div>'
             f'{url_close}'
             f'<div style="color:#5a6a7e;font-size:12px;margin-top:2px">{item["source"]}</div>'
             f'</div>'
         )
+        cards_added += 1
 
     if not cards_html:
         cards_html = (
             '<div style="background:#0a2010;border:1px solid #1a6640;'
-            'border-left:3px solid #4caf50;border-radius:0 8px 8px 0;padding:10px 14px;">'
+            'border-left:3px solid #4caf50;border-radius:0 8px 8px 0;padding:12px 14px;">'
             '<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase">CLEAR</div>'
-            '<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px">No Active Alerts</div>'
+            '<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:3px">No Active Alerts</div>'
             '<div style="color:#6b7fa3;font-size:12px;margin-top:2px">All ports below threshold</div>'
             '</div>'
         )
