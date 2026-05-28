@@ -202,7 +202,7 @@ map_col, right_col = st.columns([2, 1])
 # Map height: reference chart is 200px; map needs more — use 360px (2fr column is wide enough)
 # lataxis range cuts Antarctica dead-space; lonaxis keeps full width
 with map_col:
-    MAP_H = 360
+    MAP_H = 450
     fig = go.Figure()
     if not df_cong.empty:
         for label, color in LC.items():
@@ -239,13 +239,13 @@ with map_col:
             lataxis=dict(range=[-55, 80]),
             lonaxis=dict(range=[-170, 180]),
         ),
-        paper_bgcolor="#ffffff",
-        margin=dict(l=20, r=20, t=50, b=20),
+        paper_bgcolor="#0f2340",
+        margin=dict(l=0, r=0, t=44, b=4),
         height=MAP_H,
         # h3 style: fontSize 1.1rem (~17.6px), color #333, margin 0 0 15px 0
         title=dict(
             text="🗺️  Port Congestion Map",
-            font=dict(color="#333", size=18),
+            font=dict(color="#ffffff", size=18),
             x=0.02, y=0.99, xanchor="left", yanchor="top",
         ),
         legend=dict(
