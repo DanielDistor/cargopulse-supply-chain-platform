@@ -167,7 +167,7 @@ with map_col:
             showcountries=True, countrycolor="#94a3b8",
             showframe=False,    bgcolor="#f1f5f9",
         ),
-        paper_bgcolor="#f1f5f9",
+        paper_bgcolor="#ffffff",
         margin=dict(l=0, r=0, t=30, b=0),
         height=MAP_H,
         title=dict(text="Port Congestion Map", font=dict(color="#64748b", size=12), x=0),
