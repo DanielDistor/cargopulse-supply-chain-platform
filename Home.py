@@ -52,13 +52,13 @@ vessel_age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 # Count only vessels with valid coordinates (consistent with Vessel Tracking page)
 vessel_count = sum(1 for v in (vessels or []) if v.get("lat") is not None and v.get("lon") is not None)
 
-# Log to Supabase on every page load.
+# Log snapshot count for the 24h chart on every page load.
+# MMSI-level distinct tracking is handled exclusively by GitHub Actions
+# (scripts/log_vessels.py) to avoid duplicates from cached page loads.
 # Must stay in the main Streamlit thread; st.secrets fails in background threads.
 if vessel_count > 0:
     try:
         supabase_logger.log_snapshot(vessel_count)
-        mmsis = [v["mmsi"] for v in (vessels or []) if v.get("mmsi") and v.get("lat") is not None]
-        supabase_logger.log_vessel_mmsis(mmsis)
     except Exception:
         pass
 
