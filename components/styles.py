@@ -15,9 +15,9 @@ def inject_global_css() -> None:
             padding-right: 1.25rem !important;
         }
 
-        /* ── Section spacing ── */
-        [data-testid="stVerticalBlock"] { gap: 1rem !important; }
-        [data-testid="stHorizontalBlock"] { gap: 1.5625rem !important; }
+        /* ── Section spacing — denser enterprise feel ── */
+        [data-testid="stVerticalBlock"] { gap: 0.65rem !important; }
+        [data-testid="stHorizontalBlock"] { gap: 1rem !important; }
 
         /* ── Hide sidebar ── */
         [data-testid="stSidebar"]       { display: none !important; }
@@ -33,9 +33,9 @@ def inject_global_css() -> None:
         /* ── Plotly chart — reference panel style ── */
         [data-testid="stPlotlyChart"] {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
         }
 
         /* ── Dataframes ── */
@@ -152,9 +152,9 @@ def navbar(current: str = "") -> None:
         f"""
         <div style="
             width:100vw;position:relative;left:50%;transform:translateX(-50%);
-            background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);
-            box-shadow:0 4px 12px rgba(0,0,0,0.15);
-            padding:0 2rem;height:56px;
+            background:linear-gradient(135deg,#182d5c 0%,#1e3870 100%);
+            box-shadow:0 2px 8px rgba(0,0,0,0.18);
+            padding:0 2rem;height:50px;
             display:flex;align-items:center;justify-content:space-between;
             box-sizing:border-box;margin-bottom:1.25rem;
         ">
