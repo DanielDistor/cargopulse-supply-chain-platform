@@ -43,6 +43,16 @@ def inject_global_css() -> None:
             margin-bottom: 0 !important;
         }
 
+        /* Kill column and markdown container spacing */
+        [data-testid="column"] {
+            padding: 0 !important;
+            min-width: 0 !important;
+        }
+        .stMarkdownContainer {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
         /* Dashboard.js main split: gap "25px" = 1.5625rem — exact */
         [data-testid="stHorizontalBlock"] { gap: 1.5625rem !important; }
 
@@ -62,16 +72,16 @@ def inject_global_css() -> None:
            Dashboard.js section: borderRadius "12px", shadow exact. */
         [data-testid="stPlotlyChart"] {
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
         /* Dataframes */
         [data-testid="stDataFrame"] {
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
         hr { border-color: #eee !important; margin: 1.5rem 0; }
