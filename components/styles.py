@@ -163,7 +163,7 @@ def navbar() -> None:
             '</div>',
             unsafe_allow_html=True,
         )
-    with n1: st.page_link("Home.py",                    label="Home")
+    with n1: st.page_link("Home.py",                    label="Dashboard")
     with n2: st.page_link("pages/1_Vessel_Tracking.py", label="Vessel Tracking")
     with n3: st.page_link("pages/2_Port_Congestion.py", label="Port Congestion")
     with n4: st.page_link("pages/3_Delay_Forecast.py",  label="Delay Forecast")

@@ -11,7 +11,7 @@ from components.styles import inject_global_css, navbar
 load_dotenv()
 
 st.set_page_config(
-    page_title="CargoPulse | Supply Chain Intelligence",
+    page_title="Dashboard | CargoPulse",
     page_icon="🚢",
     layout="wide",
     initial_sidebar_state="expanded",

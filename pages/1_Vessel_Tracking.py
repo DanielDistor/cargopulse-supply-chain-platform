@@ -216,7 +216,7 @@ if show_risk_zones:
             showlegend=False,
             hoverinfo="skip",
         ))
-    fig.data = tuple(risk_traces) + tuple(fig.data)
+    fig = go.Figure(data=risk_traces + list(fig.data), layout=fig.layout)
 
 if show_ports:
     with st.spinner("Loading port congestion rings..."):
