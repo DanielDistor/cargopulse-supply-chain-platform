@@ -47,11 +47,23 @@ def _connect():
     if not u:
         return None
     try:
+        import socket
         from urllib.parse import urlparse, unquote
-        p = urlparse(u)
+        p    = urlparse(u)
+        host = p.hostname
+        port = p.port or 5432
+
+        # Streamlit Cloud can't connect via IPv6 — force an IPv4 address.
+        try:
+            ipv4 = socket.getaddrinfo(host, port, socket.AF_INET)
+            if ipv4:
+                host = ipv4[0][4][0]
+        except Exception:
+            pass  # no IPv4 found; try original hostname anyway
+
         return psycopg2.connect(
-            host=p.hostname,
-            port=p.port or 5432,
+            host=host,
+            port=port,
             dbname=(p.path or "/postgres").lstrip("/"),
             user=p.username,
             password=unquote(p.password or ""),
