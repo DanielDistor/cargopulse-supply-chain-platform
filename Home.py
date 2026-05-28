@@ -118,10 +118,13 @@ c2.markdown(_kpi("Critical Ports",   str(critical_n),            f"{high_n} high
 c3.markdown(_kpi("Active Alerts",    str(alert_count),           f"${alert_cost:.0f}M exposure",   alert_color, "#ef5350" if alert_count > 0 else "#4caf50", "⚠️"), unsafe_allow_html=True)
 c4.markdown(_kpi("BDI",             str(bdi.get("value", "—")), f"{bdi_chg:+.1f}% · {bdi.get('trend','—').upper()}", bdi_color, bdi_color, "📈"), unsafe_allow_html=True)
 
-# ── Main content ───────────────────────────────────────────────────────
-MAP_H = 480
+# Spacer so KPI row doesn't visually bleed into the panels below
+st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
-map_col, right_col = st.columns([2, 1])
+# ── Main content ───────────────────────────────────────────────────────
+MAP_H = 520
+
+map_col, right_col = st.columns([3, 2])
 LC = {"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"}
 
 # ── Left: world map ────────────────────────────────────────────────────
@@ -171,114 +174,110 @@ with map_col:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# ── Right: two panel boxes ─────────────────────────────────────────────
+# ── Right: two panel boxes — flex gap controls ALL spacing uniformly ───
 with right_col:
-    CARD_GAP = "12px"
+    # One gap value used everywhere: between title→card and card→card.
+    # No individual margin-bottom anywhere — that was the unevenness.
+    GAP = "10px"
     PANEL = (
-        'background:#1a1f2e;border:1px solid #263044;border-radius:12px;'
-        'padding:20px;display:flex;flex-direction:column;gap:' + CARD_GAP + ';'
-        'box-shadow:0 2px 10px rgba(0,0,0,0.3);'
+        f'background:#1a1f2e;border:1px solid #263044;border-radius:14px;'
+        f'padding:16px;display:flex;flex-direction:column;gap:{GAP};'
     )
-    TITLE = 'color:#e8eaed;font-size:15px;font-weight:700;margin:0;'
+    TITLE = 'color:#e8eaed;font-size:15px;font-weight:700;'
 
     # ── Port rows ───────────────────────────────────────────────────────
-    port_rows = []
+    port_html = ""
     for _, row in df_cong.head(2).iterrows():
         lc = LC.get(row.get("label", ""), "#a0aab4")
-        port_rows.append(
-            '<div style="background:#0d1117;border:1px solid #263044;'
-            'border-left:4px solid ' + lc + ';border-radius:8px;'
-            'padding:12px 16px;display:flex;align-items:center;">'
-            '<div style="flex:1;min-width:0;">'
-            '<div style="color:#e8eaed;font-size:14px;font-weight:600;'
-            'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
-            + str(row["name"]) +
-            '</div>'
-            '<div style="color:#5a6a7e;font-size:12px;margin-top:3px">'
-            + str(row["country"]) + ' · ' + str(row["vessel_count"]) + ' vessels'
-            '</div>'
-            '</div>'
-            '<div style="flex-shrink:0;margin-left:12px;">'
-            '<span style="color:' + lc + ';font-size:22px;font-weight:800">'
-            + str(row["score"]) +
-            '</span>'
-            '<span style="color:#5a6a7e;font-size:11px"> /100</span>'
-            '</div>'
-            '</div>'
+        port_html += (
+            f'<div style="background:#0d1117;border-radius:10px;padding:14px 16px;'
+            f'display:flex;align-items:center;border-left:3px solid {lc};">'
+            f'<div style="flex:1;min-width:0;">'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
+            f'<div style="color:#5a6a7e;font-size:12px;margin-top:4px">'
+            f'{row["country"]} · {row["vessel_count"]} vessels</div>'
+            f'</div>'
+            f'<div style="flex-shrink:0;margin-left:12px;">'
+            f'<span style="color:{lc};font-size:22px;font-weight:800">{row["score"]}</span>'
+            f'<span style="color:#5a6a7e;font-size:11px"> /100</span>'
+            f'</div>'
+            f'</div>'
         )
-    if not port_rows:
-        port_rows.append(
-            '<div style="background:#0d1117;border:1px solid #263044;border-radius:8px;'
-            'padding:12px 16px;color:#5a6a7e;font-size:13px">No congestion data yet</div>'
+    if not port_html:
+        port_html = (
+            '<div style="background:#0d1117;border-radius:10px;padding:14px 16px;'
+            'color:#5a6a7e;font-size:13px">No congestion data yet</div>'
         )
 
-    # ── Alert / news cards ───────────────────────────────────────────────
-    alert_cards = []
+    # ── Alert / news cards — match reference style exactly ─────────────
+    # Reference: colored tint background, NO left border, bold colored title,
+    # description line, small gray timestamp. No badge — just the title text.
+    alert_html = ""
+    n_cards = 0
 
     for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
-        if len(alert_cards) >= 3:
+        if n_cards >= 3:
             break
-        if row["score"] >= 86:
-            bg, bdr = "#ef535018", "#ef5350"
-            title_c, desc_c, time_c = "#ef5350", "#ef9a9a", "#e57373"
-            title = "Critical Congestion Detected"
-        else:
-            bg, bdr = "#ffa72618", "#ffa726"
-            title_c, desc_c, time_c = "#ffa726", "#ffcc80", "#ffb74d"
-            title = "High Congestion Alert"
-        desc = str(row["name"]) + " · " + str(row["score"]) + "/100 · " + str(row["vessel_count"]) + " vessels"
-        alert_cards.append(
-            '<div style="background:' + bg + ';border-left:4px solid ' + bdr + ';'
-            'border-radius:8px;padding:12px 16px;">'
-            '<div style="color:' + title_c + ';font-size:14px;font-weight:700">' + title + '</div>'
-            '<div style="color:' + desc_c + ';font-size:13px;margin-top:4px">' + desc + '</div>'
-            '<div style="color:' + time_c + ';font-size:11px;margin-top:4px">Just now</div>'
+        is_crit = row["score"] >= 86
+        col     = "#ef5350" if is_crit else "#ffb74d"
+        title   = f'Critical Congestion Detected' if is_crit else f'High Congestion Alert'
+        alert_html += (
+            f'<div style="background:{col}22;border-radius:10px;padding:14px 16px;">'
+            f'<div style="color:{col};font-size:13px;font-weight:700">{title}</div>'
+            f'<div style="color:#c9d1da;font-size:12px;margin-top:4px">'
+            f'{row["name"]} · {row["score"]}/100 · {row["vessel_count"]} vessels</div>'
+            f'<div style="color:#5a6a7e;font-size:11px;margin-top:4px">Just now</div>'
+            f'</div>'
+        )
+        n_cards += 1
+
+    if bdi.get("trend") == "rising" and n_cards < 3:
+        alert_html += (
+            f'<div style="background:#ffb74d22;border-radius:10px;padding:14px 16px;">'
+            f'<div style="color:#ffb74d;font-size:13px;font-weight:700">Freight Rate Rising</div>'
+            f'<div style="color:#c9d1da;font-size:12px;margin-top:4px">'
+            f'BDI index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
+            f'<div style="color:#5a6a7e;font-size:11px;margin-top:4px">Just now</div>'
+            f'</div>'
+        )
+        n_cards += 1
+
+    for item in news_items[:3 - n_cards]:
+        if n_cards >= 3:
+            break
+        url_a = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
+        alert_html += (
+            f'<div style="background:#00d4ff18;border-radius:10px;padding:14px 16px;">'
+            f'<div style="color:#00d4ff;font-size:13px;font-weight:700">'
+            f'<a {url_a} style="color:#00d4ff;text-decoration:none;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">'
+            f'{item["title"]}</a></div>'
+            f'<div style="color:#c9d1da;font-size:12px;margin-top:4px">{item["source"]}</div>'
+            f'<div style="color:#5a6a7e;font-size:11px;margin-top:4px">Maritime News</div>'
+            f'</div>'
+        )
+        n_cards += 1
+
+    if not alert_html:
+        alert_html = (
+            '<div style="background:#4caf5018;border-radius:10px;padding:14px 16px;">'
+            '<div style="color:#4caf50;font-size:13px;font-weight:700">All Systems Clear</div>'
+            '<div style="color:#c9d1da;font-size:12px;margin-top:4px">No active congestion alerts</div>'
+            '<div style="color:#5a6a7e;font-size:11px;margin-top:4px">All ports below threshold</div>'
             '</div>'
         )
 
-    if bdi.get("trend") == "rising" and len(alert_cards) < 3:
-        bdi_desc = "BDI index " + str(bdi.get("value", "N/A")) + " · " + f"{bdi_chg:+.1f}%" + " today"
-        alert_cards.append(
-            '<div style="background:#ffa72618;border-left:4px solid #ffa726;'
-            'border-radius:8px;padding:12px 16px;">'
-            '<div style="color:#ffa726;font-size:14px;font-weight:700">Freight Rate Rising</div>'
-            '<div style="color:#ffcc80;font-size:13px;margin-top:4px">' + bdi_desc + '</div>'
-            '<div style="color:#ffb74d;font-size:11px;margin-top:4px">Just now</div>'
-            '</div>'
-        )
-
-    for item in news_items[:3 - len(alert_cards)]:
-        url_a = 'href="' + item["url"] + '" target="_blank"' if item.get("url") else ""
-        alert_cards.append(
-            '<div style="background:#00d4ff18;border-left:4px solid #00d4ff;'
-            'border-radius:8px;padding:12px 16px;">'
-            '<div style="color:#00d4ff;font-size:14px;font-weight:700">'
-            '<a ' + url_a + ' style="color:#00d4ff;text-decoration:none;'
-            'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">'
-            + str(item["title"]) + '</a></div>'
-            '<div style="color:#80deea;font-size:13px;margin-top:4px">' + str(item["source"]) + '</div>'
-            '<div style="color:#5a6a7e;font-size:11px;margin-top:4px">Maritime News</div>'
-            '</div>'
-        )
-
-    if not alert_cards:
-        alert_cards.append(
-            '<div style="background:#4caf5018;border-left:4px solid #4caf50;'
-            'border-radius:8px;padding:12px 16px;">'
-            '<div style="color:#4caf50;font-size:14px;font-weight:700">All Systems Clear</div>'
-            '<div style="color:#a5d6a7;font-size:13px;margin-top:4px">No active congestion alerts</div>'
-            '<div style="color:#81c784;font-size:11px;margin-top:4px">All ports below threshold</div>'
-            '</div>'
-        )
-
+    # Panels: flex column with gap={GAP} handles title→card and card→card spacing.
+    # The SAME gap value everywhere = perfectly uniform margins throughout.
     right_html = (
-        '<div style="' + PANEL + 'margin-bottom:25px;">'
-        '<div style="' + TITLE + '">📍 Top Congested Ports</div>'
-        + "".join(port_rows) +
-        '</div>'
-        '<div style="' + PANEL + '">'
-        '<div style="' + TITLE + '">🔔 Live Alerts &amp; News</div>'
-        + "".join(alert_cards) +
-        '</div>'
+        f'<div style="{PANEL}margin-bottom:{GAP};">'
+        f'<div style="{TITLE}">📍 Top Congested Ports</div>'
+        + port_html +
+        f'</div>'
+        f'<div style="{PANEL}">'
+        f'<div style="{TITLE}">🔔 Live Alerts &amp; News</div>'
+        + alert_html +
+        f'</div>'
     )
     st.markdown(right_html, unsafe_allow_html=True)
