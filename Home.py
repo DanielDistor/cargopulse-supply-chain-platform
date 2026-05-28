@@ -16,16 +16,16 @@ from components.styles import inject_global_css, navbar
 
 load_dotenv()
 
-# Auto-refresh every 10 minutes (600 000 ms).
-# Each cycle fetches fresh AIS data and logs a Supabase snapshot.
-st_autorefresh(interval=10 * 60 * 1000, key="dashboard_refresh")
-
 st.set_page_config(
     page_title="Dashboard | CargoPulse",
     page_icon="⚓",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# Auto-refresh every 10 minutes — must come after set_page_config.
+st_autorefresh(interval=10 * 60 * 1000, key="dashboard_refresh")
+
 inject_global_css()
 navbar(current="Dashboard")
 
