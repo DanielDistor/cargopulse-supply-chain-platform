@@ -239,7 +239,6 @@ MAP_H = 640
 _DATA_JS = (
     f"const VESSELS = {json.dumps(vessels_for_map)};\n"
     f"const PORTS_DATA = {json.dumps(ports_for_map)};\n"
-    f"const RISK_ZONES = {json.dumps(RISK_ZONES)};\n"
 )
 
 # ── HTML template (no f-string — avoids JS {{ }} escaping) ─────────────
@@ -282,10 +281,6 @@ html,body{width:100%;height:100%;overflow:hidden;
   width:100%;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;
   font-size:12px;color:#334155;cursor:pointer;margin-bottom:9px;
 }
-.fp-row{display:flex;align-items:center;gap:7px;}
-.fp-row label{font-size:12px;color:#475569;cursor:pointer;}
-.fp-row input{cursor:pointer;}
-
 /* ── Legend ── */
 #legend{
   position:absolute;bottom:28px;right:14px;
@@ -319,8 +314,6 @@ html,body{width:100%;height:100%;overflow:hidden;
 
 <div id="status-bar">
   <span><span class="sdot" style="background:#22c55e;"></span><b id="cnt-active">0</b> Active</span>
-  <span style="color:#475569">·</span>
-  <span><span class="sdot" style="background:#ef4444;"></span><b id="cnt-risk">0</b> in Risk Zones</span>
 </div>
 
 <div id="filter-panel">
@@ -334,10 +327,6 @@ html,body{width:100%;height:100%;overflow:hidden;
     <option value="Special">Special</option>
     <option value="Other">Other</option>
   </select>
-  <div class="fp-row">
-    <input type="checkbox" id="chk-risk" checked onchange="toggleRisk()">
-    <label for="chk-risk">Show Risk Zones</label>
-  </div>
 </div>
 
 <div id="legend">
@@ -443,48 +432,13 @@ const allMarkers = VESSELS.map(function(v) {
 });
 allMarkers.forEach(function(o) { vesselLayer.addLayer(o.m); });
 
-// ── Risk zones ─────────────────────────────────────────────────────────────
-const riskLayer = L.layerGroup().addTo(map);
-const RCOL = {Piracy:'#ef5350', Security:'#ff7043', Geopolitical:'#a855f7', Congestion:'#f59e0b'};
-
-RISK_ZONES.forEach(function(z) {
-  const c = RCOL[z.type] || '#94a3b8';
-  L.circle([z.lat, z.lon], {
-    radius: z.radius_km * 1000,
-    color: c, fillColor: c, fillOpacity: 0.07,
-    weight: 1.5, dashArray: '5 5',
-  }).bindTooltip(`<b>${z.name}</b><br>${z.type} · ${z.radius_km} km radius`, {sticky: true})
-    .addTo(riskLayer);
-  L.marker([z.lat, z.lon], {
-    icon: L.divIcon({
-      html: `<span style="color:${c};font-size:9px;font-weight:700;
-               white-space:nowrap;text-shadow:0 0 3px white,0 0 3px white,0 0 3px white;">${z.name}</span>`,
-      className: '',
-      iconAnchor: [30, 6],
-    }),
-    interactive: false,
-  }).addTo(riskLayer);
-});
-
-// ── Haversine (km) ────────────────────────────────────────────────────────
-function hvKm(la1, lo1, la2, lo2) {
-  const R = 6371, dL = (la2-la1)*Math.PI/180, dN = (lo2-lo1)*Math.PI/180;
-  const a = Math.sin(dL/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-function inRisk(lat, lon) {
-  return RISK_ZONES.some(z => hvKm(lat, lon, z.lat, z.lon) <= z.radius_km);
-}
-
 // ── Update status bar ─────────────────────────────────────────────────────
 function updateCounts(filter) {
-  let active = 0, risks = 0;
+  let active = 0;
   allMarkers.forEach(function(o) {
-    const visible = filter === 'all' || o.cat === filter;
-    if (visible) { active++; if (inRisk(o.lat, o.lon)) risks++; }
+    if (filter === 'all' || o.cat === filter) active++;
   });
   document.getElementById('cnt-active').textContent = active;
-  document.getElementById('cnt-risk').textContent   = risks;
 }
 
 // ── Filter ────────────────────────────────────────────────────────────────
@@ -495,10 +449,6 @@ function applyFilter() {
     if (f === 'all' || o.cat === f) vesselLayer.addLayer(o.m);
   });
   updateCounts(f);
-}
-
-function toggleRisk() {
-  document.getElementById('chk-risk').checked ? map.addLayer(riskLayer) : map.removeLayer(riskLayer);
 }
 
 // ── Legend ────────────────────────────────────────────────────────────────
