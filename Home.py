@@ -126,55 +126,99 @@ c4.markdown(_kpi("BDI",             bdi_display,                 f"{bdi_chg:+.1f
 # Spacer so KPI row doesn't visually bleed into the panels below
 st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
-# ── Map card CSS — injected before the columns so selectors are live ───
+# ── Map card CSS ───────────────────────────────────────────────────────
 st.markdown(
     """
     <style>
-    /* ── Scope: only the row containing the Plotly map ───────────────── */
+    /* ════════════════════════════════════════════════════════════════════
+       MAP CARD — corner clipping + equal-height grid
+       Scope: only elements inside the row that owns the Plotly chart.
+       ════════════════════════════════════════════════════════════════════ */
 
-    /* 1. Force the row itself to be a proper flex container with stretch */
-    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"]) {
-        display:        flex        !important;
-        flex-direction: row         !important;
-        align-items:    stretch     !important;
+    /* ── Row: equal-height flex, no wrap ─────────────────────────────── */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"]) {
+        display:        flex    !important;
+        flex-direction: row     !important;
+        flex-wrap:      nowrap  !important;   /* prevent columns from stacking */
+        align-items:    stretch !important;   /* both columns same height     */
     }
 
-    /* 2. Left column = the card.
-          align-self:stretch overrides Streamlit's internal flex-start.
-          transform:translateZ(0) forces GPU compositing so overflow:hidden
-          actually clips the Plotly iframe at the rounded corners. */
-    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
-    > div[data-testid="stColumn"]:first-child {
-        background:      #ffffff;
-        border:          1px solid #e2e8f0;
-        border-radius:   14px;
-        overflow:        hidden;
-        box-shadow:      0 1px 3px rgba(0,0,0,0.04);
-        padding:         0          !important;
-        display:         flex       !important;
-        flex-direction:  column     !important;
-        align-self:      stretch    !important;
-        transform:       translateZ(0);   /* GPU layer — makes overflow clip the iframe */
-        isolation:       isolate;          /* new stacking context — same effect */
+    /* ── Map column: card styling ─────────────────────────────────────
+       contain:paint is the key — it enforces the border-radius clip on ALL
+       descendant content (including Plotly's own divs) more reliably than
+       overflow:hidden alone, which can be bypassed by inner stacking contexts.
+       ──────────────────────────────────────────────────────────────── */
+    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"]) {
+        background:     #ffffff;
+        border:         1px solid #e2e8f0;
+        border-radius:  16px !important;
+        overflow:       hidden !important;
+        contain:        paint;              /* paints only within border-radius */
+        box-shadow:     0 1px 3px rgba(0,0,0,0.04);
+        padding:        0 !important;
+        display:        flex !important;
+        flex-direction: column !important;
+        align-self:     stretch !important;
     }
 
-    /* 3. Strip the inner Plotly element's own border/radius; column owns the card */
-    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    /* ── Strip padding from every intermediate Streamlit wrapper ───────
+       stVerticalBlock and element-container both add padding by default;
+       that gap between the column edge and the chart content is what makes
+       the rounded corners appear invisible (white gap fills the arc).
+       ──────────────────────────────────────────────────────────────── */
+    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"])
+    > div[data-testid="stVerticalBlock"] {
+        padding:        0 !important;
+        margin:         0 !important;
+        gap:            0 !important;
+        flex:           1;
+        display:        flex !important;
+        flex-direction: column !important;
+    }
+
+    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"])
+    div[data-testid="element-container"] {
+        padding: 0 !important;
+        margin:  0 !important;
+    }
+
+    /* ── Inner Plotly element: remove its own border/radius ──────────── */
+    div[data-testid="stColumn"]:has(div[data-testid="stPlotlyChart"])
     div[data-testid="stPlotlyChart"] {
-        border:        none      !important;
-        border-radius: 0         !important;
-        box-shadow:    none      !important;
-        margin:        0         !important;
+        border:        none !important;
+        border-radius: 0    !important;
+        box-shadow:    none !important;
+        padding:       0    !important;
+        margin:        0    !important;
         background:    #ffffff;
     }
 
-    /* 4. Right column: flex column, no extra padding */
-    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    /* ── Right column: flex column, stretch to row height ───────────── */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"])
     > div[data-testid="stColumn"]:last-child {
-        display:        flex     !important;
-        flex-direction: column   !important;
-        align-self:     stretch  !important;
-        padding:        0        !important;
+        display:        flex    !important;
+        flex-direction: column  !important;
+        align-self:     stretch !important;
+        padding:        0       !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"])
+    > div[data-testid="stColumn"]:last-child
+    > div[data-testid="stVerticalBlock"] {
+        flex:           1;
+        display:        flex    !important;
+        flex-direction: column  !important;
+        padding:        0       !important;
+        gap:            0       !important;
+    }
+
+    /* Make the right-panel markdown block fill available vertical space */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stPlotlyChart"])
+    > div[data-testid="stColumn"]:last-child
+    div[data-testid="stMarkdownContainer"] {
+        flex:           1;
+        display:        flex    !important;
+        flex-direction: column  !important;
     }
     </style>
     """,
@@ -329,16 +373,18 @@ with right_col:
             '</div>'
         )
 
-    # Panels: flex column with gap={GAP} handles title→card and card→card spacing.
-    # The SAME gap value everywhere = perfectly uniform margins throughout.
+    # Outer wrapper fills 100% of the right column height via flex.
+    # Live Alerts panel gets flex:1 so it expands to meet the map card's bottom.
     right_html = (
-        f'<div style="{PANEL}margin-bottom:{GAP};">'
+        f'<div style="display:flex;flex-direction:column;gap:{GAP};height:100%;">'
+        f'<div style="{PANEL}">'
         f'<div style="{TITLE}">📍 Top Congested Ports</div>'
         + port_html +
         f'</div>'
-        f'<div style="{PANEL}">'
+        f'<div style="{PANEL}flex:1;">'
         f'<div style="{TITLE}">🔔 Live Alerts &amp; News</div>'
         + alert_html +
+        f'</div>'
         f'</div>'
     )
     st.markdown(right_html, unsafe_allow_html=True)
