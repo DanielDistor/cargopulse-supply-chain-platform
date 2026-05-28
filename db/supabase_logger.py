@@ -81,7 +81,10 @@ def test_connection() -> dict:
 
 
 def log_snapshot(total: int) -> None:
-    """Insert one row on every call. Called on every dashboard page load."""
+    """
+    Insert one row per page load, but skip if a row was already written
+    in the last 60 seconds (guards against rapid refresh spam).
+    """
     if not _HTTPX_OK:
         return
     base = _api_base()
@@ -89,6 +92,15 @@ def log_snapshot(total: int) -> None:
     if not base or not key:
         return
     try:
+        since = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
+        r = httpx.get(
+            f"{base}/rest/v1/vessel_activity",
+            headers=_headers(),
+            params={"select": "id", "logged_at": f"gte.{since}", "limit": "1"},
+            timeout=5,
+        )
+        if r.status_code == 200 and r.json():
+            return  # already logged in the last minute — skip
         httpx.post(
             f"{base}/rest/v1/vessel_activity",
             headers=_headers(),
