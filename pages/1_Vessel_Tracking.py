@@ -110,7 +110,11 @@ if not vessels:
     st.warning("No vessel data available. Check that AISSTREAM_API_KEY is set and try refreshing.")
     st.stop()
 
-df = pd.DataFrame(vessels).dropna(subset=["lat", "lon"])
+df = pd.DataFrame(vessels) if vessels else pd.DataFrame(columns=["lat", "lon", "mmsi", "name", "speed", "heading", "status"])
+if not df.empty and {"lat", "lon"}.issubset(df.columns):
+    df = df.dropna(subset=["lat", "lon"])
+else:
+    df = df.reindex(columns=["lat", "lon", "mmsi", "name", "speed", "heading", "status"])
 df["category"] = df.apply(classify_vessel, axis=1)
 cat_order = list(COLOR_MAP.keys())
 df["category"] = pd.Categorical(df["category"], categories=cat_order, ordered=True)
