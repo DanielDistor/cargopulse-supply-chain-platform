@@ -79,7 +79,7 @@ else:
 #               status fontSize "0.85rem", color/bg/padding/radius/border exact
 st.markdown(
     '<div style="display:flex;justify-content:space-between;align-items:center;'
-    'margin-bottom:25px;">'
+    'margin-bottom:20px;">'
     '<div>'
     '<h1 style="margin:0 0 5px 0;color:#1f3c88;font-size:24px;font-weight:700">'
     'Supply Chain Intelligence</h1>'
@@ -125,16 +125,16 @@ alrt_tc = "#d32f2f" if alert_count > 3 else "#f57c00" if alert_count > 0 else "#
 bdi_tc  = "#d32f2f" if bdi_chg > 0 else "#2e7d32" if bdi_chg < 0 else "#888"
 
 # Exact card inner template
-_CI = 'padding:20px;display:flex;justify-content:space-between;align-items:flex-start;background:white;'
-_LB = 'margin:0 0 8px 0;font-size:0.8rem;text-transform:uppercase;font-weight:700;color:#888;'
-_VL = 'font-size:2rem;font-weight:700;margin:0 0 5px 0;color:#333;line-height:1.1;'
-_TR = 'font-size:0.85rem;font-weight:500;color:#555;'
-_IC = 'font-size:2rem;opacity:0.2;flex-shrink:0;'
+_CI = 'padding:14px 20px;display:flex;justify-content:space-between;align-items:flex-start;background:white;'
+_LB = 'margin:0 0 5px 0;font-size:0.75rem;text-transform:uppercase;font-weight:700;color:#888;'
+_VL = 'font-size:1.75rem;font-weight:700;margin:0 0 4px 0;color:#333;line-height:1.1;'
+_TR = 'font-size:0.82rem;font-weight:500;color:#555;'
+_IC = 'font-size:1.5rem;opacity:0.2;flex-shrink:0;'
 
 st.markdown(
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);'
-    'border-radius:12px;overflow:hidden;'
-    'box-shadow:0 2px 10px rgba(0,0,0,0.05);margin-bottom:25px;">'
+    'border-radius:8px;overflow:hidden;'
+    'box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:20px;">'
 
     '<div style="' + _CI + 'border-left:4px solid #1f3c88;border-right:1px solid #eee;">'
     '<div style="flex:1">'
@@ -202,7 +202,7 @@ map_col, right_col = st.columns([2, 1])
 # Map height: reference chart is 200px; map needs more — use 360px (2fr column is wide enough)
 # lataxis range cuts Antarctica dead-space; lonaxis keeps full width
 with map_col:
-    MAP_H = 450
+    MAP_H = 400
     fig = go.Figure()
     if not df_cong.empty:
         for label, color in LC.items():
@@ -264,12 +264,11 @@ with map_col:
 with right_col:
     # Panel template (exact reference values)
     PANEL = (
-        'background:white;border-radius:12px;'
-        'box-shadow:0 2px 10px rgba(0,0,0,0.05);padding:20px;'
-        'display:flex;flex-direction:column;gap:10px;'
+        'background:white;border-radius:8px;'
+        'box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:14px 18px;'
+        'display:flex;flex-direction:column;gap:8px;'
     )
-    # h3 exact: margin "0 0 15px 0", fontSize "1.1rem", color "#333"
-    H3 = 'margin:0 0 15px 0;font-size:1.1rem;font-weight:600;color:#333;'
+    H3 = 'margin:0 0 10px 0;font-size:1rem;font-weight:600;color:#333;'
 
     # ── Top Congested Ports — Quick Actions button style (exact):
     # padding "12px", border "1px solid #eee", background "#f8f9fa",
@@ -279,28 +278,28 @@ with right_col:
     for _, row in df_cong.head(2).iterrows():
         lc = LC.get(row.get("label", ""), "#888")
         port_rows.append(
-            '<div style="padding:12px;border:1px solid #eee;background:#f8f9fa;'
-            'border-radius:8px;border-left:4px solid ' + lc + ';'
+            '<div style="padding:9px 12px;border:1px solid #eee;background:#f8f9fa;'
+            'border-radius:6px;border-left:4px solid ' + lc + ';'
             'display:flex;align-items:center;">'
             '<div style="flex:1;min-width:0;">'
-            '<div style="font-weight:600;color:#555;font-size:0.9rem;'
+            '<div style="font-weight:600;color:#555;font-size:0.85rem;'
             'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
             + str(row["name"]) + '</div>'
-            '<div style="color:#888;font-size:0.8rem;margin-top:3px">'
+            '<div style="color:#888;font-size:0.75rem;margin-top:2px">'
             + str(row["country"]) + ' · ' + str(row["vessel_count"]) + ' vessels'
             '</div>'
             '</div>'
             '<div style="flex-shrink:0;margin-left:12px;text-align:right;">'
-            '<span style="color:' + lc + ';font-size:1.3rem;font-weight:700">'
+            '<span style="color:' + lc + ';font-size:1.1rem;font-weight:700">'
             + str(row["score"]) + '</span>'
-            '<span style="color:#bbb;font-size:0.75rem"> /100</span>'
+            '<span style="color:#bbb;font-size:0.7rem"> /100</span>'
             '</div>'
             '</div>'
         )
     if not port_rows:
         port_rows.append(
-            '<div style="padding:12px;border:1px solid #eee;background:#f8f9fa;'
-            'border-radius:8px;color:#888;font-size:0.85rem">No congestion data yet</div>'
+            '<div style="padding:9px 12px;border:1px solid #eee;background:#f8f9fa;'
+            'border-radius:6px;color:#888;font-size:0.82rem">No congestion data yet</div>'
         )
 
     # ── Live Alerts & News
@@ -337,11 +336,11 @@ with right_col:
             title = "High Congestion Alert"
         desc = str(row["name"]) + " · " + str(row["score"]) + "/100 · " + str(row["vessel_count"]) + " vessels"
         alert_cards.append(
-            '<div style="background:' + bg + ';padding:12px;border-radius:8px;'
+            '<div style="background:' + bg + ';padding:9px 12px;border-radius:6px;'
             'border-left:4px solid ' + bdr + ';">'
-            '<div style="font-size:0.9rem;font-weight:700;color:' + tc + ';margin-bottom:4px">' + title + '</div>'
-            '<p style="margin:0;font-size:0.85rem;color:' + bc + '">' + desc + '</p>'
-            '<small style="color:' + sc + ';font-size:0.75rem;margin-top:5px;display:block">Just now</small>'
+            '<div style="font-size:0.82rem;font-weight:700;color:' + tc + ';margin-bottom:2px">' + title + '</div>'
+            '<p style="margin:0;font-size:0.8rem;color:' + bc + '">' + desc + '</p>'
+            '<small style="color:' + sc + ';font-size:0.7rem;margin-top:3px;display:block">Just now</small>'
             '</div>'
         )
 
@@ -349,11 +348,11 @@ with right_col:
         # Medium priority (orange) — Dashboard.js exact
         bdi_desc = "BDI index " + str(bdi.get("value", "N/A")) + " · " + f"{bdi_chg:+.1f}%" + " today"
         alert_cards.append(
-            '<div style="background:#fff3e0;padding:12px;border-radius:8px;'
+            '<div style="background:#fff3e0;padding:9px 12px;border-radius:6px;'
             'border-left:4px solid #ffa726;">'
-            '<div style="font-size:0.9rem;font-weight:700;color:#ef6c00;margin-bottom:4px">Freight Rate Rising</div>'
-            '<p style="margin:0;font-size:0.85rem;color:#e65100">' + bdi_desc + '</p>'
-            '<small style="color:#ffb74d;font-size:0.75rem;margin-top:5px;display:block">Just now</small>'
+            '<div style="font-size:0.82rem;font-weight:700;color:#ef6c00;margin-bottom:2px">Freight Rate Rising</div>'
+            '<p style="margin:0;font-size:0.8rem;color:#e65100">' + bdi_desc + '</p>'
+            '<small style="color:#ffb74d;font-size:0.7rem;margin-top:3px;display:block">Just now</small>'
             '</div>'
         )
 
@@ -363,31 +362,31 @@ with right_col:
         url_a = 'href="' + item["url"] + '" target="_blank"' if item.get("url") else ""
         # index.css .auth__message: bg #e7f6ff, border #b4dcff — closest to news
         alert_cards.append(
-            '<div style="background:#e7f6ff;padding:12px;border-radius:8px;'
+            '<div style="background:#e7f6ff;padding:9px 12px;border-radius:6px;'
             'border-left:4px solid #1f3c88;">'
-            '<div style="font-size:0.9rem;font-weight:700;color:#1565c0;margin-bottom:4px">'
+            '<div style="font-size:0.82rem;font-weight:700;color:#1565c0;margin-bottom:2px">'
             '<a ' + url_a + ' style="color:#1565c0;text-decoration:none;'
             'overflow:hidden;text-overflow:ellipsis;display:block;white-space:nowrap">'
             + str(item["title"]) + '</a></div>'
-            '<p style="margin:0;font-size:0.85rem;color:#555">' + str(item["source"]) + '</p>'
-            '<small style="color:#999;font-size:0.75rem;margin-top:5px;display:block">Maritime News</small>'
+            '<p style="margin:0;font-size:0.8rem;color:#555">' + str(item["source"]) + '</p>'
+            '<small style="color:#999;font-size:0.7rem;margin-top:3px;display:block">Maritime News</small>'
             '</div>'
         )
 
     if not alert_cards:
         # Low priority (green) — Dashboard.js exact
         alert_cards.append(
-            '<div style="background:#e8f5e9;padding:12px;border-radius:8px;'
+            '<div style="background:#e8f5e9;padding:9px 12px;border-radius:6px;'
             'border-left:4px solid #66bb6a;">'
-            '<div style="font-size:0.9rem;font-weight:700;color:#2e7d32;margin-bottom:4px">All Systems Clear</div>'
-            '<p style="margin:0;font-size:0.85rem;color:#1b5e20">No active congestion alerts</p>'
-            '<small style="color:#81c784;font-size:0.75rem;margin-top:5px;display:block">All ports below threshold</small>'
+            '<div style="font-size:0.82rem;font-weight:700;color:#2e7d32;margin-bottom:2px">All Systems Clear</div>'
+            '<p style="margin:0;font-size:0.8rem;color:#1b5e20">No active congestion alerts</p>'
+            '<small style="color:#81c784;font-size:0.7rem;margin-top:3px;display:block">All ports below threshold</small>'
             '</div>'
         )
 
     # Dashboard.js right column gap: "25px" → margin-bottom between panels
     right_html = (
-        '<div style="' + PANEL + 'margin-bottom:25px;">'
+        '<div style="' + PANEL + 'margin-bottom:16px;">'
         '<h3 style="' + H3 + '">📍 Top Congested Ports</h3>'
         + "".join(port_rows) +
         '</div>'

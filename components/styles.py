@@ -62,16 +62,16 @@ def inject_global_css() -> None:
            Dashboard.js section: borderRadius "12px", shadow exact. */
         [data-testid="stPlotlyChart"] {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
         }
 
         /* Dataframes */
         [data-testid="stDataFrame"] {
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
         }
 
         hr { border-color: #eee !important; margin: 1.5rem 0; }
