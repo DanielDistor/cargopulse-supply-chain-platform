@@ -47,18 +47,14 @@ vessel_age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 # Count only vessels with valid coordinates (consistent with Vessel Tracking page)
 vessel_count = sum(1 for v in (vessels or []) if v.get("lat") is not None and v.get("lon") is not None)
 
-# Log to Supabase on fresh fetches only (age < 60s = cache was just written this load).
-# Must run here in the main Streamlit thread — st.secrets is unavailable in background threads.
-_sb_url_set  = bool(supabase_logger._url())
-_sb_pkg_ok   = supabase_logger._PSYCOPG2_OK
-_sb_log_fired = False
-_sb_log_err   = ""
-if vessel_age is not None and vessel_age < 60 and vessel_count > 0:
+# Log to Supabase on every page load — log_snapshot() deduplicates internally
+# (skips insert if a row was already written in the last 10 minutes).
+# Must stay in the main Streamlit thread; st.secrets fails in background threads.
+if vessel_count > 0:
     try:
         supabase_logger.log_snapshot(vessel_count)
-        _sb_log_fired = True
-    except Exception as _e:
-        _sb_log_err = str(_e)
+    except Exception:
+        pass
 
 critical_n  = int((df_cong["score"] >= 86).sum()) if not df_cong.empty else 0
 high_n      = int(((df_cong["score"] >= 61) & (df_cong["score"] < 86)).sum()) if not df_cong.empty else 0
@@ -137,19 +133,6 @@ c1.markdown(_kpi("Vessels Tracked",  f"{vessel_count:,}",        f"across {len(p
 c2.markdown(_kpi("Critical Ports",   str(critical_n),            f"{high_n} high risk",            crit_color,  "#ef4444" if critical_n > 0 else "#22c55e", "⚓"), unsafe_allow_html=True)
 c3.markdown(_kpi("Active Alerts",    str(alert_count),           f"${alert_cost:.0f}M exposure",   alert_color, "#ef4444" if alert_count > 0 else "#22c55e", "⚠️"), unsafe_allow_html=True)
 c4.markdown(_kpi("BDI",             bdi_display,                 f"{bdi_chg:+.1f}% · {bdi.get('trend','unknown').upper()}", bdi_color, bdi_color, "📈"), unsafe_allow_html=True)
-
-# ── TEMPORARY DEBUG — remove after Supabase is confirmed working ────────
-with st.expander("🔧 Supabase debug", expanded=False):
-    st.write({
-        "psycopg2_installed": _sb_pkg_ok,
-        "url_set":            _sb_url_set,
-        "vessel_age_s":       vessel_age,
-        "age_check_passed":   vessel_age is not None and vessel_age < 60,
-        "log_fired":          _sb_log_fired,
-        "log_error":          _sb_log_err or "none",
-        "row_count":          len(supabase_logger.get_daily_activity(30)),
-    })
-# ── END TEMPORARY DEBUG ─────────────────────────────────────────────────
 
 # Spacer so KPI row doesn't visually bleed into the panels below
 st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)

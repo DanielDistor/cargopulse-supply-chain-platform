@@ -68,8 +68,8 @@ def _ensure_table(conn) -> None:
 
 def log_snapshot(total: int) -> None:
     """
-    Insert one snapshot row with the current vessel count.
-    Called after every fresh AIS fetch (~every 15 minutes).
+    Insert one snapshot row — but only if no row was written in the last 10 minutes.
+    Safe to call on every page load; deduplication is handled here, not in the caller.
     """
     conn = _connect()
     if conn is None:
@@ -77,7 +77,15 @@ def log_snapshot(total: int) -> None:
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO vessel_activity (total) VALUES (%s)", (int(total),))
+            # Conditional insert: skip if a row already exists within the last 10 min
+            cur.execute("""
+                INSERT INTO vessel_activity (total)
+                SELECT %s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM vessel_activity
+                    WHERE logged_at > NOW() - INTERVAL '10 minutes'
+                )
+            """, (int(total),))
         conn.commit()
     except Exception:
         pass
