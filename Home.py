@@ -47,6 +47,14 @@ vessel_age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
 # Count only vessels with valid coordinates (consistent with Vessel Tracking page)
 vessel_count = sum(1 for v in (vessels or []) if v.get("lat") is not None and v.get("lon") is not None)
 
+# Log to Supabase on fresh fetches only (age < 60s = cache was just written this load).
+# Must run here in the main Streamlit thread — st.secrets is unavailable in background threads.
+if vessel_age is not None and vessel_age < 60 and vessel_count > 0:
+    try:
+        supabase_logger.log_snapshot(vessel_count)
+    except Exception:
+        pass
+
 critical_n  = int((df_cong["score"] >= 86).sum()) if not df_cong.empty else 0
 high_n      = int(((df_cong["score"] >= 61) & (df_cong["score"] < 86)).sum()) if not df_cong.empty else 0
 alert_count = int((df_cong["score"] >= 60).sum()) + (1 if bdi.get("trend") == "rising" else 0)

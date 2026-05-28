@@ -42,9 +42,13 @@ def _connect():
     if not u:
         return None
     try:
-        return psycopg2.connect(u, connect_timeout=5)
+        return psycopg2.connect(u, connect_timeout=5, sslmode="require")
     except Exception:
-        return None
+        try:
+            # Fallback without explicit sslmode (some connection strings include it already)
+            return psycopg2.connect(u, connect_timeout=5)
+        except Exception:
+            return None
 
 
 def _ensure_table(conn) -> None:
