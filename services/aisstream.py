@@ -149,6 +149,11 @@ def get_vessels(bounding_boxes: list, duration_seconds: int = 15) -> list[dict]:
 
     if vessels:
         cache.set(VESSEL_CACHE_KEY, {"vessels": vessels})
+        try:
+            from db import supabase_logger
+            supabase_logger.log_snapshot(len(vessels))
+        except Exception:
+            pass
         return vessels
 
     # Fetch returned nothing — serve stale data rather than a blank page

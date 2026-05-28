@@ -385,3 +385,102 @@ window.addEventListener('load', function() {{
 </html>"""
 
 components.html(section_html, height=SECTION_H + 2, scrolling=False)
+
+# ── Fleet Activity Charts ───────────────────────────────────────────────
+st.markdown('<div style="height:18px;"></div>', unsafe_allow_html=True)
+st.markdown(
+    '<div style="color:#1e293b;font-size:17px;font-weight:800;'
+    'letter-spacing:-0.01em;margin-bottom:12px;">Fleet Activity Analytics</div>',
+    unsafe_allow_html=True,
+)
+
+from db import supabase_logger
+
+daily  = supabase_logger.get_daily_activity(7)
+hourly = supabase_logger.get_hourly_activity()
+
+_CHART_FONT = dict(family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+                   color="#64748b", size=11)
+_CHART_LAYOUT = dict(
+    paper_bgcolor="#ffffff",
+    plot_bgcolor="#ffffff",
+    font=_CHART_FONT,
+    margin=dict(l=8, r=8, t=36, b=8),
+    height=240,
+    xaxis=dict(showgrid=False, zeroline=False, tickfont=_CHART_FONT,
+               linecolor="#e2e8f0", tickcolor="#e2e8f0"),
+    yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False,
+               tickfont=_CHART_FONT, linecolor="#e2e8f0"),
+)
+
+ch_left, ch_right = st.columns(2)
+
+# ── Chart 1: Fleet activity last 7 days ────────────────────────────────
+with ch_left:
+    with st.container():
+        if daily:
+            labels = [str(r["day"]) for r in daily]
+            values = [float(r["avg_total"]) for r in daily]
+            fig_d = go.Figure(go.Scatter(
+                x=labels, y=values,
+                mode="lines+markers",
+                line=dict(color="#3b82f6", width=2.5),
+                marker=dict(color="#3b82f6", size=6),
+                fill="tozeroy",
+                fillcolor="rgba(59,130,246,0.08)",
+                hovertemplate="%{x}<br><b>%{y:.0f} vessels</b><extra></extra>",
+            ))
+            fig_d.update_layout(
+                **_CHART_LAYOUT,
+                title=dict(text="<b>Fleet Activity — Last 7 Days</b>",
+                           font=dict(color="#1e293b", size=13), x=0, xanchor="left"),
+            )
+            st.plotly_chart(fig_d, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.markdown(
+                '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
+                'height:240px;display:flex;flex-direction:column;align-items:center;'
+                'justify-content:center;gap:8px;">'
+                '<div style="font-size:28px">📡</div>'
+                '<div style="color:#1e293b;font-size:14px;font-weight:700">Collecting Data</div>'
+                '<div style="color:#94a3b8;font-size:12px;text-align:center;max-width:220px">'
+                'Fleet Activity — Last 7 Days<br>Check back in a few hours</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+# ── Chart 2: Fleet activity by hour ────────────────────────────────────
+with ch_right:
+    with st.container():
+        if hourly:
+            hours  = [r["hour"] for r in hourly]
+            avgs   = [float(r["avg_total"]) for r in hourly]
+            fig_h = go.Figure(go.Bar(
+                x=hours, y=avgs,
+                marker_color="#3b82f6",
+                marker_line_width=0,
+                opacity=0.85,
+                hovertemplate="Hour %{x}:00<br><b>%{y:.0f} vessels avg</b><extra></extra>",
+            ))
+            fig_h.update_layout(
+                **_CHART_LAYOUT,
+                title=dict(text="<b>Fleet Activity by Hour (UTC)</b>",
+                           font=dict(color="#1e293b", size=13), x=0, xanchor="left"),
+                xaxis=dict(**_CHART_LAYOUT["xaxis"],
+                           tickvals=list(range(0, 24, 3)),
+                           ticktext=[f"{h:02d}:00" for h in range(0, 24, 3)]),
+                bargap=0.25,
+            )
+            st.plotly_chart(fig_h, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.markdown(
+                '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
+                'height:240px;display:flex;flex-direction:column;align-items:center;'
+                'justify-content:center;gap:8px;">'
+                '<div style="font-size:28px">🕐</div>'
+                '<div style="color:#1e293b;font-size:14px;font-weight:700">Collecting Data</div>'
+                '<div style="color:#94a3b8;font-size:12px;text-align:center;max-width:220px">'
+                'Fleet Activity by Hour<br>Check back in a few hours</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
