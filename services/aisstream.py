@@ -46,7 +46,7 @@ async def _fetch_snapshot(bounding_boxes: list, duration_seconds: int) -> list[d
     subscription = {
         "APIKey":             api_key,
         "BoundingBoxes":      bounding_boxes,
-        "FilterMessageTypes": ["PositionReport", "ShipStaticData", "ClassBCSStaticData"],
+        "FilterMessageTypes": ["PositionReport"],
     }
     vessels: dict[str, dict] = {}
     vessel_types: dict[str, int] = {}
