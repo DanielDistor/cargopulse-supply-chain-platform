@@ -168,7 +168,7 @@ with map_col:
             showframe=False,    bgcolor="#ffffff",
         ),
         paper_bgcolor="#ffffff",
-        margin=dict(l=0, r=0, t=30, b=0),
+        margin=dict(l=8, r=8, t=36, b=8),
         height=MAP_H,
         title=dict(text="Port Congestion Map", font=dict(color="#64748b", size=12), x=0),
         legend=dict(

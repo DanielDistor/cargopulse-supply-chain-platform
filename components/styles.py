@@ -6,7 +6,7 @@ def inject_global_css() -> None:
         """
         <style>
         /* ── Page chrome ── */
-        .stApp { background-color: #0f1117; }
+        .stApp { background-color: #f1f5f9; }
         header[data-testid="stHeader"] { display: none !important; }
         .block-container { padding-top: 0.25rem !important; padding-bottom: 1rem !important; }
 
@@ -21,61 +21,66 @@ def inject_global_css() -> None:
 
         /* ── Custom navbar link hover ── */
         .cp-nav-link:hover {
-            color: #e8eaed !important;
-            background: rgba(255,255,255,0.07) !important;
+            color: #ffffff !important;
+            background: rgba(255,255,255,0.12) !important;
         }
 
         /* ── Sidebar ── */
         [data-testid="stSidebar"] {
-            background-color: #1a1f2e;
-            border-right: 1px solid #1e2736;
+            background-color: #ffffff;
+            border-right: 1px solid #e2e8f0;
         }
-        [data-testid="stSidebar"] .stMarkdown p { color: #a0aab4; }
+        [data-testid="stSidebar"] .stMarkdown p { color: #64748b; }
 
         /* ── KPI metric cards ── */
         [data-testid="stMetric"] {
-            background: linear-gradient(135deg, #1a1f2e 0%, #16202f 100%);
-            border: 1px solid #263044;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
             padding: 20px 24px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         }
-        [data-testid="stMetricLabel"] { color: #6b7fa3 !important; font-size: 12px !important; text-transform: uppercase; letter-spacing: 0.08em; }
-        [data-testid="stMetricValue"] { color: #e8eaed !important; font-size: 28px !important; font-weight: 700 !important; }
+        [data-testid="stMetricLabel"] { color: #64748b !important; font-size: 12px !important; text-transform: uppercase; letter-spacing: 0.08em; }
+        [data-testid="stMetricValue"] { color: #1e293b !important; font-size: 28px !important; font-weight: 700 !important; }
         [data-testid="stMetricDelta"] svg { display: none; }
 
         /* ── Plotly chart containers ── */
         [data-testid="stPlotlyChart"] {
-            border-radius: 12px;
+            border-radius: 14px;
             overflow: hidden;
-            border: 1px solid #1e2736;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+        [data-testid="stPlotlyChart"] > div,
+        [data-testid="stPlotlyChart"] iframe {
+            border-radius: 14px !important;
         }
 
         /* ── Dataframes ── */
         [data-testid="stDataFrame"] {
             border-radius: 10px;
             overflow: hidden;
-            border: 1px solid #1e2736;
+            border: 1px solid #e2e8f0;
         }
 
         /* ── Dividers ── */
-        hr { border-color: #1e2736 !important; margin: 1.5rem 0; }
+        hr { border-color: #e2e8f0 !important; margin: 1.5rem 0; }
 
         /* ── Page title ── */
-        h1 { color: #e8eaed !important; font-weight: 800; letter-spacing: -0.02em; }
-        h2 { color: #c9d1da !important; font-weight: 700; }
-        h3 { color: #a0aab4 !important; font-weight: 600; }
+        h1 { color: #1e293b !important; font-weight: 800; letter-spacing: -0.02em; }
+        h2 { color: #334155 !important; font-weight: 700; }
+        h3 { color: #475569 !important; font-weight: 600; }
 
         /* ── Caption ── */
         .stCaption, [data-testid="stCaptionContainer"] p {
-            color: #5a6a7e !important;
+            color: #94a3b8 !important;
             font-size: 13px !important;
         }
 
         /* ── Buttons ── */
         .stButton button {
-            background: linear-gradient(135deg, #0099cc 0%, #00d4ff 100%);
-            color: #0f1117;
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            color: #ffffff;
             border: none;
             border-radius: 8px;
             font-weight: 700;
@@ -84,57 +89,57 @@ def inject_global_css() -> None:
         }
         .stButton button:hover {
             transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.3);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
         }
 
         /* ── Info boxes ── */
         [data-testid="stInfo"] {
-            background-color: #0d2035 !important;
-            border: 1px solid #0099cc !important;
+            background-color: #eff6ff !important;
+            border: 1px solid #3b82f6 !important;
             border-radius: 10px !important;
-            color: #a0cfea !important;
+            color: #1d4ed8 !important;
         }
 
         /* ── Warning boxes ── */
         [data-testid="stWarning"] {
-            background-color: #1e1500 !important;
-            border: 1px solid #b8860b !important;
+            background-color: #fffbeb !important;
+            border: 1px solid #f59e0b !important;
             border-radius: 10px !important;
         }
 
         /* ── Spinner ── */
-        .stSpinner > div { border-top-color: #00d4ff !important; }
+        .stSpinner > div { border-top-color: #3b82f6 !important; }
 
         /* ── Expander ── */
         [data-testid="stExpander"] {
-            border: 1px solid #1e2736 !important;
+            border: 1px solid #e2e8f0 !important;
             border-radius: 10px !important;
-            background-color: #1a1f2e !important;
+            background-color: #ffffff !important;
         }
 
         /* ── Selectbox / Multiselect ── */
         [data-testid="stSelectbox"] > div,
         [data-testid="stMultiSelect"] > div {
-            background-color: #1a1f2e;
-            border-color: #263044;
+            background-color: #ffffff;
+            border-color: #e2e8f0;
             border-radius: 8px;
         }
 
-        /* ── Multiselect selected pills — override bright cyan default ── */
+        /* ── Multiselect selected pills ── */
         [data-testid="stMultiSelect"] [data-baseweb="tag"] {
-            background-color: #1e2736 !important;
-            border: 1px solid #374357 !important;
+            background-color: #f1f5f9 !important;
+            border: 1px solid #cbd5e1 !important;
         }
         [data-testid="stMultiSelect"] [data-baseweb="tag"] span {
-            color: #a0aab4 !important;
+            color: #475569 !important;
         }
         [data-testid="stMultiSelect"] [data-baseweb="tag"] [role="button"] {
-            color: #6b7fa3 !important;
+            color: #64748b !important;
         }
 
         /* ── Slider ── */
-        [data-testid="stSlider"] [class*="thumb"] { background-color: #00d4ff !important; }
-        [data-testid="stSlider"] [class*="track"] { background-color: #00d4ff !important; }
+        [data-testid="stSlider"] [class*="thumb"] { background-color: #3b82f6 !important; }
+        [data-testid="stSlider"] [class*="track"] { background-color: #3b82f6 !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -156,8 +161,8 @@ def navbar(current: str = "") -> None:
     for label, path in _pages:
         if label == current:
             links += (
-                f'<a href="{path}" style="'
-                f'background:#00d4ff;color:#0f1117;'
+                f'<a href="{path}" target="_self" style="'
+                f'background:#3b82f6;color:#ffffff;'
                 f'padding:6px 14px;border-radius:6px;'
                 f'font-size:13px;font-weight:700;'
                 f'text-decoration:none;white-space:nowrap;">'
@@ -165,8 +170,8 @@ def navbar(current: str = "") -> None:
             )
         else:
             links += (
-                f'<a href="{path}" class="cp-nav-link" style="'
-                f'color:#8899a6;padding:6px 10px;border-radius:6px;'
+                f'<a href="{path}" target="_self" class="cp-nav-link" style="'
+                f'color:#94a3b8;padding:6px 10px;border-radius:6px;'
                 f'font-size:13px;font-weight:500;'
                 f'text-decoration:none;white-space:nowrap;">'
                 f'{label}</a>'
@@ -176,14 +181,14 @@ def navbar(current: str = "") -> None:
         f"""
         <div style="
             width:100vw;position:relative;left:50%;transform:translateX(-50%);
-            background:#0d1822;border-bottom:1px solid #1e2736;
+            background:#1e3a5f;border-bottom:1px solid #1a3356;
             padding:0 2rem;height:54px;
             display:flex;align-items:center;justify-content:space-between;
             box-sizing:border-box;margin-bottom:1.5rem;
         ">
             <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
                 <span style="font-size:22px">⚓</span>
-                <span style="color:#e8eaed;font-size:17px;font-weight:800;
+                <span style="color:#ffffff;font-size:17px;font-weight:800;
                              letter-spacing:-0.01em;">CargoPulse</span>
             </div>
             <div style="display:flex;align-items:center;gap:4px;">{links}</div>
@@ -198,8 +203,8 @@ def page_header(title: str, subtitle: str) -> None:
     st.markdown(
         f"""
         <div style="margin-bottom:8px;">
-            <h1 style="margin:0;padding:0;color:#e8eaed;font-size:2rem;font-weight:800;">{title}</h1>
-            <p style="margin:4px 0 0 0;color:#5a6a7e;font-size:14px;">{subtitle}</p>
+            <h1 style="margin:0;padding:0;color:#1e293b;font-size:2rem;font-weight:800;">{title}</h1>
+            <p style="margin:4px 0 0 0;color:#64748b;font-size:14px;">{subtitle}</p>
         </div>
         """,
         unsafe_allow_html=True,
