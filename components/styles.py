@@ -10,20 +10,27 @@ def inject_global_css() -> None:
         header[data-testid="stHeader"] { display: none !important; }
         .block-container { padding-top: 0.25rem !important; padding-bottom: 1rem !important; }
 
-        /* ── Compact element spacing ── */
-        [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
-        [data-testid="stHorizontalBlock"] { gap: 0.75rem !important; }
+        /* ── Section spacing — matches reference 20-25px gaps ── */
+        [data-testid="stVerticalBlock"] { gap: 1.5rem !important; }
+        [data-testid="stHorizontalBlock"] { gap: 1.5rem !important; }
 
-        /* ── Hide sidebar ── */
+        /* ── Hide sidebar and its toggle button entirely ── */
         [data-testid="stSidebar"]       { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebarContent"] { display: none !important; }
 
-        /* ── Navbar link hover ── */
+        /* ── Custom navbar link hover ── */
         .cp-nav-link:hover {
             color: #e8eaed !important;
             background: rgba(255,255,255,0.07) !important;
         }
+
+        /* ── Sidebar ── */
+        [data-testid="stSidebar"] {
+            background-color: #1a1f2e;
+            border-right: 1px solid #1e2736;
+        }
+        [data-testid="stSidebar"] .stMarkdown p { color: #a0aab4; }
 
         /* ── KPI metric cards ── */
         [data-testid="stMetric"] {
@@ -54,7 +61,7 @@ def inject_global_css() -> None:
         /* ── Dividers ── */
         hr { border-color: #1e2736 !important; margin: 1.5rem 0; }
 
-        /* ── Page titles ── */
+        /* ── Page title ── */
         h1 { color: #e8eaed !important; font-weight: 800; letter-spacing: -0.02em; }
         h2 { color: #c9d1da !important; font-weight: 700; }
         h3 { color: #a0aab4 !important; font-weight: 600; }
@@ -80,9 +87,6 @@ def inject_global_css() -> None:
             box-shadow: 0 6px 20px rgba(0, 212, 255, 0.3);
         }
 
-        /* ── Spinner ── */
-        .stSpinner > div { border-top-color: #00d4ff !important; }
-
         /* ── Info boxes ── */
         [data-testid="stInfo"] {
             background-color: #0d2035 !important;
@@ -97,6 +101,9 @@ def inject_global_css() -> None:
             border: 1px solid #b8860b !important;
             border-radius: 10px !important;
         }
+
+        /* ── Spinner ── */
+        .stSpinner > div { border-top-color: #00d4ff !important; }
 
         /* ── Expander ── */
         [data-testid="stExpander"] {
@@ -113,7 +120,7 @@ def inject_global_css() -> None:
             border-radius: 8px;
         }
 
-        /* ── Multiselect pills ── */
+        /* ── Multiselect selected pills ── */
         [data-testid="stMultiSelect"] [data-baseweb="tag"] {
             background-color: #1e2736 !important;
             border: 1px solid #374357 !important;
@@ -127,7 +134,7 @@ def inject_global_css() -> None:
 
         /* ── Slider ── */
         [data-testid="stSlider"] [class*="thumb"] { background-color: #00d4ff !important; }
-        [data-testid="stSlider"] [class*="track"]  { background-color: #00d4ff !important; }
+        [data-testid="stSlider"] [class*="track"] { background-color: #00d4ff !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -135,7 +142,7 @@ def inject_global_css() -> None:
 
 
 def navbar(current: str = "") -> None:
-    """Full-width dark navigation bar."""
+    """Full-width dark navigation bar. Pass current= the label of the active page."""
     _pages = [
         ("Dashboard",        "/"),
         ("Vessel Tracking",  "/Vessel_Tracking"),
