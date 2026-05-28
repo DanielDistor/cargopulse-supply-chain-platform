@@ -10,9 +10,9 @@ def inject_global_css() -> None:
         header[data-testid="stHeader"] { display: none !important; }
         .block-container { padding-top: 0.25rem !important; padding-bottom: 1rem !important; }
 
-        /* ── Tighten element spacing globally ── */
-        [data-testid="stVerticalBlock"] { gap: 0.6rem !important; }
-        [data-testid="stHorizontalBlock"] { gap: 0.75rem !important; }
+        /* ── Section spacing — matches reference 20-25px gaps ── */
+        [data-testid="stVerticalBlock"] { gap: 1.5rem !important; }
+        [data-testid="stHorizontalBlock"] { gap: 1.5rem !important; }
 
         /* ── Hide sidebar and its toggle button entirely ── */
         [data-testid="stSidebar"]       { display: none !important; }
