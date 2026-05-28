@@ -8,7 +8,11 @@ def inject_global_css() -> None:
         /* ── Page chrome ── */
         .stApp { background-color: #0f1117; }
         header[data-testid="stHeader"] { display: none !important; }
-        .block-container { padding-top: 0.5rem !important; padding-bottom: 3rem !important; }
+        .block-container { padding-top: 0.25rem !important; padding-bottom: 1rem !important; }
+
+        /* ── Compact element spacing — keeps pages on one screen ── */
+        [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
+        [data-testid="stHorizontalBlock"] { gap: 0.75rem !important; }
 
         /* ── Hide sidebar and its toggle button entirely ── */
         [data-testid="stSidebar"]       { display: none !important; }
