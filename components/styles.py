@@ -10,8 +10,8 @@ def inject_global_css() -> None:
         header[data-testid="stHeader"] { display: none !important; }
         .block-container { padding-top: 0.25rem !important; padding-bottom: 1rem !important; }
 
-        /* ── Compact element spacing — keeps pages on one screen ── */
-        [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
+        /* ── Tighten element spacing globally ── */
+        [data-testid="stVerticalBlock"] { gap: 0.6rem !important; }
         [data-testid="stHorizontalBlock"] { gap: 0.75rem !important; }
 
         /* ── Hide sidebar and its toggle button entirely ── */

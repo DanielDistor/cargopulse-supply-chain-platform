@@ -61,24 +61,24 @@ else:
 st.markdown(
     f"""
     <div style="display:flex;justify-content:space-between;align-items:center;
-                padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid #1e2736;">
+                padding-bottom:12px;border-bottom:1px solid #1e2736;">
         <div>
-            <div style="color:#e8eaed;font-size:20px;font-weight:800;
+            <div style="color:#e8eaed;font-size:22px;font-weight:800;
                         letter-spacing:-0.02em;line-height:1.2">Supply Chain Intelligence</div>
-            <div style="color:#5a6a7e;font-size:12px;margin-top:2px">
+            <div style="color:#5a6a7e;font-size:13px;margin-top:4px">
                 Live port congestion &nbsp;·&nbsp; vessel tracking
                 &nbsp;·&nbsp; BDI freight analysis &nbsp;·&nbsp; {len(ports)} ports monitored
             </div>
         </div>
-        <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
             <span style="color:#5a6a7e;font-size:12px">🕐 Last sync:
                 <b style="color:#a0aab4">{age_str}</b></span>
             <div style="background:{status_color}18;border:1px solid {status_color}55;
-                        border-radius:20px;padding:4px 12px;
-                        display:flex;align-items:center;gap:5px;">
-                <div style="width:6px;height:6px;border-radius:50%;
-                            background:{status_color};box-shadow:0 0 4px {status_color}"></div>
-                <span style="color:{status_color};font-size:11px;font-weight:600">{status_label}</span>
+                        border-radius:20px;padding:5px 14px;
+                        display:flex;align-items:center;gap:6px;">
+                <div style="width:7px;height:7px;border-radius:50%;
+                            background:{status_color};box-shadow:0 0 5px {status_color}"></div>
+                <span style="color:{status_color};font-size:12px;font-weight:600">{status_label}</span>
             </div>
         </div>
     </div>
@@ -89,14 +89,14 @@ st.markdown(
 # ── KPI row ────────────────────────────────────────────────────────────
 def _kpi(label, value, sub, sub_color="#6b7fa3", border_color=None):
     bl = f"border-left:3px solid {border_color};" if border_color else ""
-    br = "0 8px 8px 0" if border_color else "8px"
+    br = "0 10px 10px 0" if border_color else "10px"
     return (
         f'<div style="background:#1a1f2e;border:1px solid #263044;{bl}'
-        f'border-radius:{br};padding:10px 16px;height:74px;'
+        f'border-radius:{br};padding:14px 18px;height:88px;'
         f'display:flex;flex-direction:column;justify-content:space-between;">'
-        f'<div style="color:#6b7fa3;font-size:10px;text-transform:uppercase;letter-spacing:.07em">{label}</div>'
-        f'<div style="color:#e8eaed;font-size:22px;font-weight:800;line-height:1">{value}</div>'
-        f'<div style="color:{sub_color};font-size:11px">{sub}</div>'
+        f'<div style="color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{label}</div>'
+        f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{value}</div>'
+        f'<div style="color:{sub_color};font-size:12px">{sub}</div>'
         f'</div>'
     )
 
@@ -110,17 +110,15 @@ c2.markdown(_kpi("Critical Ports",   str(critical_n),            f"{high_n} high
 c3.markdown(_kpi("Active Alerts",    str(alert_count),           f"${alert_cost:.0f}M exposure", alert_color, "#ef5350" if alert_count > 0 else None),  unsafe_allow_html=True)
 c4.markdown(_kpi("BDI",             str(bdi.get("value", "—")), f"{bdi_chg:+.1f}% · {bdi.get('trend','—').upper()}",          bdi_color),              unsafe_allow_html=True)
 
-# ── Main: world map (left) + ports & alerts (right) ────────────────────
-map_col, right_col = st.columns([3, 2])
+# ── Main content ───────────────────────────────────────────────────────
+# Map height and right-panel height are kept identical so both columns end together.
+MAP_H = 440
 
+map_col, right_col = st.columns([3, 2])
 LC = {"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"}
 
+# ── Left: world map ────────────────────────────────────────────────────
 with map_col:
-    st.markdown(
-        '<div style="color:#a0aab4;font-size:11px;text-transform:uppercase;'
-        'letter-spacing:.07em;margin-bottom:4px;">Port Congestion Map</div>',
-        unsafe_allow_html=True,
-    )
     fig = go.Figure()
     if not df_cong.empty:
         for label, color in LC.items():
@@ -148,15 +146,16 @@ with map_col:
     fig.update_layout(
         geo=dict(
             projection_type="natural earth",
-            showland=True,     landcolor="#1a1f2e",
-            showocean=True,    oceancolor="#0d1218",
+            showland=True,      landcolor="#1a1f2e",
+            showocean=True,     oceancolor="#0d1218",
             showlakes=False,
             showcountries=True, countrycolor="#263044",
-            showframe=False,   bgcolor="#0f1117",
+            showframe=False,    bgcolor="#0f1117",
         ),
         paper_bgcolor="#0f1117",
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=460,
+        margin=dict(l=0, r=0, t=30, b=0),
+        height=MAP_H,
+        title=dict(text="Port Congestion Map", font=dict(color="#a0aab4", size=12), x=0),
         legend=dict(
             bgcolor="#1a1f2e", bordercolor="#263044",
             font=dict(color="#a0aab4", size=11),
@@ -165,98 +164,111 @@ with map_col:
     )
     st.plotly_chart(fig, use_container_width=True)
 
+# ── Right: ports + alerts in one fixed-height HTML block ───────────────
 with right_col:
-    # ── Top Congested Ports — single HTML block ────────────────────────
-    st.markdown(
-        '<div style="color:#a0aab4;font-size:11px;text-transform:uppercase;'
-        'letter-spacing:.07em;margin-bottom:4px;">Top Congested Ports</div>',
-        unsafe_allow_html=True,
-    )
-
+    # Build ports HTML (top 3)
     ports_html = ""
-    for _, row in df_cong.head(4).iterrows():
+    for _, row in df_cong.head(3).iterrows():
         lc = LC.get(row.get("label", ""), "#a0aab4")
         ports_html += (
-            f'<div style="display:flex;align-items:center;padding:7px 10px;margin-bottom:4px;'
-            f'background:#1a1f2e;border-radius:6px;border:1px solid #263044;border-left:3px solid {lc};">'
+            f'<div style="display:flex;align-items:center;padding:11px 14px;margin-bottom:6px;'
+            f'background:#1a1f2e;border-radius:8px;border:1px solid #263044;border-left:3px solid {lc};">'
             f'<div style="flex:1;min-width:0;">'
-            f'  <div style="color:#e8eaed;font-size:13px;font-weight:600;'
+            f'  <div style="color:#e8eaed;font-size:14px;font-weight:600;'
             f'       white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-            f'  <div style="color:#5a6a7e;font-size:11px">{row["country"]} · {row["vessel_count"]} vessels</div>'
+            f'  <div style="color:#5a6a7e;font-size:12px;margin-top:2px">{row["country"]} · {row["vessel_count"]} vessels</div>'
             f'</div>'
-            f'<div style="text-align:right;flex-shrink:0;margin-left:8px;">'
-            f'  <span style="color:{lc};font-size:16px;font-weight:800">{row["score"]}</span>'
-            f'  <span style="color:#5a6a7e;font-size:10px">/100</span>'
+            f'<div style="text-align:right;flex-shrink:0;margin-left:12px;">'
+            f'  <span style="color:{lc};font-size:18px;font-weight:800">{row["score"]}</span>'
+            f'  <span style="color:#5a6a7e;font-size:11px"> /100</span>'
             f'</div>'
             f'</div>'
         )
-    st.markdown(ports_html, unsafe_allow_html=True)
 
-    # ── Live Alerts + News — single HTML block ─────────────────────────
-    st.markdown(
-        '<div style="color:#a0aab4;font-size:11px;text-transform:uppercase;'
-        'letter-spacing:.07em;margin-top:6px;margin-bottom:4px;">Live Alerts &amp; News</div>',
-        unsafe_allow_html=True,
-    )
+    # Build alerts + news HTML (max 3 total)
+    cards_html = ""
 
-    alerts_html = ""
-
-    # Congestion alerts
     for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
         sev   = "CRITICAL" if row["score"] >= 86 else "HIGH"
         color = "#b71c1c"  if sev == "CRITICAL"  else "#ef5350"
-        alerts_html += (
+        cards_html += (
             f'<div style="background:{color}18;border:1px solid {color}44;'
-            f'border-left:3px solid {color};border-radius:0 6px 6px 0;'
-            f'padding:7px 10px;margin-bottom:4px;">'
-            f'<div style="color:{color};font-size:9px;font-weight:700;'
+            f'border-left:3px solid {color};border-radius:0 8px 8px 0;'
+            f'padding:10px 14px;margin-bottom:6px;">'
+            f'<div style="color:{color};font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">{sev}</div>'
-            f'<div style="color:#e8eaed;font-size:12px;font-weight:600;'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["name"]}</div>'
-            f'<div style="color:#6b7fa3;font-size:11px">'
+            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">'
             f'Congestion {row["score"]}/100 · {row["vessel_count"]} vessels nearby</div>'
             f'</div>'
         )
+
     if bdi.get("trend") == "rising":
-        alerts_html += (
+        cards_html += (
             f'<div style="background:#ffb74d18;border:1px solid #ffb74d44;'
-            f'border-left:3px solid #ffb74d;border-radius:0 6px 6px 0;'
-            f'padding:7px 10px;margin-bottom:4px;">'
-            f'<div style="color:#ffb74d;font-size:9px;font-weight:700;'
+            f'border-left:3px solid #ffb74d;border-radius:0 8px 8px 0;'
+            f'padding:10px 14px;margin-bottom:6px;">'
+            f'<div style="color:#ffb74d;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">WATCH</div>'
-            f'<div style="color:#e8eaed;font-size:12px;font-weight:600">Rising BDI — Freight Pressure</div>'
-            f'<div style="color:#6b7fa3;font-size:11px">'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px">Rising BDI</div>'
+            f'<div style="color:#6b7fa3;font-size:12px;margin-top:2px">'
             f'Index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
             f'</div>'
         )
 
-    # News headlines
     for item in get_maritime_news(n=3):
-        url_open  = f'<a href="{item["url"]}" target="_blank" style="text-decoration:none">' if item.get("url") else "<span>"
-        url_close = "</a>" if item.get("url") else "</span>"
-        alerts_html += (
+        url_open  = f'<a href="{item["url"]}" target="_blank" style="text-decoration:none;display:block">' if item.get("url") else '<div>'
+        url_close = '</a>' if item.get("url") else '</div>'
+        cards_html += (
             f'<div style="background:#1a1f2e;border:1px solid #263044;'
-            f'border-left:3px solid #00d4ff;border-radius:0 6px 6px 0;'
-            f'padding:7px 10px;margin-bottom:4px;">'
-            f'<div style="color:#00d4ff;font-size:9px;font-weight:700;'
+            f'border-left:3px solid #00d4ff;border-radius:0 8px 8px 0;'
+            f'padding:10px 14px;margin-bottom:6px;">'
+            f'<div style="color:#00d4ff;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">NEWS</div>'
             f'{url_open}'
-            f'<div style="color:#e8eaed;font-size:12px;font-weight:600;'
+            f'<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px;'
             f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{item["title"]}</div>'
             f'{url_close}'
-            f'<div style="color:#5a6a7e;font-size:11px">{item["source"]}</div>'
+            f'<div style="color:#5a6a7e;font-size:12px;margin-top:2px">{item["source"]}</div>'
             f'</div>'
         )
 
-    if not alerts_html:
-        alerts_html = (
+    if not cards_html:
+        cards_html = (
             '<div style="background:#0a2010;border:1px solid #1a6640;'
-            'border-left:3px solid #4caf50;border-radius:0 6px 6px 0;padding:8px 10px;">'
-            '<div style="color:#4caf50;font-size:9px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:.06em">CLEAR</div>'
-            '<div style="color:#e8eaed;font-size:12px;font-weight:600">No Active Alerts</div>'
-            '<div style="color:#6b7fa3;font-size:11px">All ports below threshold</div>'
+            'border-left:3px solid #4caf50;border-radius:0 8px 8px 0;padding:10px 14px;">'
+            '<div style="color:#4caf50;font-size:10px;font-weight:700;text-transform:uppercase">CLEAR</div>'
+            '<div style="color:#e8eaed;font-size:14px;font-weight:600;margin-top:2px">No Active Alerts</div>'
+            '<div style="color:#6b7fa3;font-size:12px;margin-top:2px">All ports below threshold</div>'
             '</div>'
         )
 
-    st.markdown(alerts_html, unsafe_allow_html=True)
+    # Render entire right column as one block — no extra Streamlit element spacing
+    st.markdown(
+        f"""
+        <div style="height:{MAP_H}px;display:flex;flex-direction:column;overflow:hidden;">
+
+            <!-- Top half: congested ports -->
+            <div style="display:flex;flex-direction:column;">
+                <div style="color:#a0aab4;font-size:11px;font-weight:600;
+                            text-transform:uppercase;letter-spacing:.07em;
+                            margin-bottom:8px;">Top Congested Ports</div>
+                {ports_html}
+            </div>
+
+            <!-- Divider -->
+            <div style="border-top:1px solid #1e2736;margin:10px 0;flex-shrink:0;"></div>
+
+            <!-- Bottom half: alerts + news -->
+            <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+                <div style="color:#a0aab4;font-size:11px;font-weight:600;
+                            text-transform:uppercase;letter-spacing:.07em;
+                            margin-bottom:8px;">Live Alerts &amp; News</div>
+                {cards_html}
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
