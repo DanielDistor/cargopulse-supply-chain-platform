@@ -49,8 +49,17 @@ def classify_movement(row: dict) -> str:
     return "Slow / Maneuvering"
 
 
-def get_vessel_category(code=None, name: str = "") -> str:
-    """Classify by AIS type code first, then ship-name keywords as fallback."""
+def get_vessel_category(code=None, name: str = "", nav_status=None) -> str:
+    """
+    Classify vessel type.  Priority order:
+      1. AIS navigational status 7 = 'Engaged in Fishing' (definitive)
+      2. AIS ShipStaticData type code (definitive when available)
+      3. Ship-name keyword heuristics (broad fallback)
+    """
+    # Nav status 7 is 'Engaged in fishing' — reliable even without static data
+    if nav_status == 7:
+        return "Fishing"
+
     if code is not None:
         try:
             c = int(code)
@@ -61,15 +70,58 @@ def get_vessel_category(code=None, name: str = "") -> str:
             if 50 <= c <= 59: return "Special"
         except (ValueError, TypeError):
             pass
+
     nm = (name or "").upper()
-    if any(k in nm for k in ["TANKER", " OIL", "CRUDE", "LNG", "LPG", "VLCC", "AFRAMAX", "GAS CARRIER"]):
-        return "Tanker"
-    if any(k in nm for k in ["CONTAINER", "CARGO", "BULK", "FREIGHTER", "CARRIER", "COSCO", "EVERGREEN", "MAERSK"]):
-        return "Cargo"
-    if any(k in nm for k in ["FERRY", "PASSENGER", "CRUISE", "LINER"]):
-        return "Passenger"
-    if any(k in nm for k in ["FISH", "TRAWLER", "FISHING"]):
-        return "Fishing"
+
+    # ── Tanker (check before Cargo — some names contain both) ─────────────
+    _TANKER = [
+        "TANKER", " OIL ", "CRUDE", "LNG", "LPG", " GAS ", "VLCC",
+        "AFRAMAX", "SUEZMAX", "CHEMICAL", "PRODUCT TK", "BITUMEN",
+        "NAPHTHA", "STENA ", "TEEKAY", "FRONTLINE", "TSAKOS", "EURONAV",
+        "HAFNIA", "NORDIC CHEMICAL", "NORDIC TANKER", "NORDIC TK",
+        "DELTA TK", "GULF TK", "COSMO OIL", "BP EAGLE",
+        "SCORPIO TK", "ARDMORE", "DIAMOND S", "GENER8",
+    ]
+    if any(k in nm for k in _TANKER): return "Tanker"
+
+    # ── Cargo: container ships, bulk carriers, general cargo ──────────────
+    _CARGO = [
+        "CONTAINER", "CARGO", "BULK", "FREIGHTER", "CARRIER",
+        "COSCO ", "EVERGREEN", "EVER ", "MAERSK", "MSC ", " MSC",
+        "CMA CGM", "HAPAG", "YANG MING", " ONE ", "OOCL", " APL ",
+        " NYK ", " MOL ", "K LINE", "SEASPAN", "COSTAMARE", "DANAOS",
+        "ULTRAMAX", "SUPRAMAX", "HANDYSIZE", "HANDYMAX", "CAPESIZE",
+        "KAMSARMAX", "NEWCASTLEMAX", "PANAMAX", "PACIFIC BASIN",
+        "DIANA SHIPPING", "STAR BULK", "GOLDEN OCEAN", "NAVIOS",
+        "SCORPIO BULK", "BERGE ", "VALE ", " IRON ", " COAL ",
+        "GRAIN ", "CEMENT", "STONE ", "STEEL ", " ORE ",
+    ]
+    if any(k in nm for k in _CARGO): return "Cargo"
+
+    # ── Passenger ─────────────────────────────────────────────────────────
+    _PASS = [
+        "FERRY", "PASSENGER", "CRUISE", "LINER",
+        "CELEBRITY", "CARNIVAL", "ROYAL CARIBBEAN", "COSTA ",
+        "PRINCESS", "QUEEN ", "EMPRESS", "VIKING ",
+        "PONANT", "SILVERSEA", "SEABOURN", "AZAMARA",
+        "CUNARD", "OCEANIA", "REGENT ", "WINDSTAR",
+        " FERRY", "FJORD", "HURTIGRUTEN",
+    ]
+    if any(k in nm for k in _PASS): return "Passenger"
+
+    # ── Fishing ──────────────────────────────────────────────────────────
+    _FISH = ["FISH", "TRAWL", "PURSE", "SEINER", "LONGLINER"]
+    if any(k in nm for k in _FISH): return "Fishing"
+
+    # ── Special / service vessels ─────────────────────────────────────────
+    _SPEC = [
+        "TUG ", " TUG", "PILOT", "DREDG", "CRANE VESSEL",
+        "OFFSHORE", " PSV", " AHTS", "ANCHOR HANDLING",
+        "PLATFORM", "ICEBREAKER", "SURVEY", "RESEARCH",
+        "COASTGUARD", "COAST GUARD", "NAVAL", "WARSHIP",
+    ]
+    if any(k in nm for k in _SPEC): return "Special"
+
     return "Other"
 
 
@@ -105,7 +157,11 @@ else:
 
 df["movement"] = df.apply(classify_movement, axis=1)
 df["category"] = df.apply(
-    lambda r: get_vessel_category(r.get("vessel_type_code"), r.get("name", "")),
+    lambda r: get_vessel_category(
+        r.get("vessel_type_code"),
+        r.get("name", ""),
+        r.get("status"),
+    ),
     axis=1,
 )
 

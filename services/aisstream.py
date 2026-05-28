@@ -39,29 +39,55 @@ def parse_position_report(message: dict) -> dict | None:
 
 
 async def _fetch_snapshot(bounding_boxes: list, duration_seconds: int) -> list[dict]:
-    """Connect to AISstream, collect vessels for duration_seconds, return list."""
+    """Connect to AISstream, collect vessels for duration_seconds, return list.
+
+    Subscribes to both PositionReport and ShipStaticData so vessel type codes
+    are captured whenever they arrive within the fetch window.
+    """
     api_key = os.getenv("AISSTREAM_API_KEY", "")
     subscription = {
         "APIKey": api_key,
         "BoundingBoxes": bounding_boxes,
-        "FilterMessageTypes": ["PositionReport"],
+        "FilterMessageTypes": ["PositionReport", "ShipStaticData", "ClassBCSStaticData"],
     }
     vessels: dict[str, dict] = {}
+    vessel_types: dict[str, int] = {}
     try:
         async with websockets.connect(AISSTREAM_URL, ping_interval=20) as ws:
             await ws.send(json.dumps(subscription))
             deadline = asyncio.get_event_loop().time() + duration_seconds
             while asyncio.get_event_loop().time() < deadline:
                 try:
-                    raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
-                    vessel = parse_position_report(json.loads(raw))
-                    if vessel and vessel["mmsi"]:
-                        vessels[vessel["mmsi"]] = vessel
+                    raw  = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                    msg  = json.loads(raw)
+                    mtype = msg.get("MessageType", "")
+                    meta  = msg.get("MetaData", {})
+                    mmsi  = str(meta.get("MMSI", ""))
+
+                    if mtype == "PositionReport":
+                        vessel = parse_position_report(msg)
+                        if vessel and vessel["mmsi"]:
+                            vessels[vessel["mmsi"]] = vessel
+
+                    elif mtype in ("ShipStaticData", "ClassBCSStaticData"):
+                        static = msg.get("Message", {}).get(mtype, {})
+                        code   = static.get("Type")
+                        if mmsi and code is not None:
+                            vessel_types[mmsi] = int(code)
+
                 except asyncio.TimeoutError:
                     continue
     except Exception:
         pass
-    return list(vessels.values())
+
+    # Merge type codes into vessel dicts
+    result = []
+    for mmsi, v in vessels.items():
+        if mmsi in vessel_types:
+            v = dict(v)
+            v["vessel_type_code"] = vessel_types[mmsi]
+        result.append(v)
+    return result
 
 
 def get_vessels(bounding_boxes: list, duration_seconds: int = 3) -> list[dict]:
