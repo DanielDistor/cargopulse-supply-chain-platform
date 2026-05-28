@@ -7,7 +7,8 @@ _DEFAULT_DB = os.path.join(os.path.dirname(__file__), "cache.db")
 
 
 def _db_path() -> str:
-    return os.environ.get("CACHE_DB_PATH", _DEFAULT_DB)
+    path = os.environ.get("CACHE_DB_PATH", "").strip()
+    return path if path else _DEFAULT_DB
 
 
 def _connect() -> sqlite3.Connection:
