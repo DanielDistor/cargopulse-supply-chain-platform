@@ -130,42 +130,51 @@ st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 st.markdown(
     """
     <style>
-    /* Target only the row that contains the Plotly chart */
+    /* ── Scope: only the row containing the Plotly map ───────────────── */
 
-    /* Stretch both columns to the same height so map bottom = right panel bottom */
-    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"]) {
-        align-items: stretch !important;
+    /* 1. Force the row itself to be a proper flex container with stretch */
+    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"]) {
+        display:        flex        !important;
+        flex-direction: row         !important;
+        align-items:    stretch     !important;
     }
 
-    /* Left column IS the card — apply border/radius here, not on the inner chart */
-    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
-    > [data-testid="stColumn"]:first-child {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        padding: 0 !important;
-        display: flex;
-        flex-direction: column;
+    /* 2. Left column = the card.
+          align-self:stretch overrides Streamlit's internal flex-start.
+          transform:translateZ(0) forces GPU compositing so overflow:hidden
+          actually clips the Plotly iframe at the rounded corners. */
+    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    > div[data-testid="stColumn"]:first-child {
+        background:      #ffffff;
+        border:          1px solid #e2e8f0;
+        border-radius:   14px;
+        overflow:        hidden;
+        box-shadow:      0 1px 3px rgba(0,0,0,0.04);
+        padding:         0          !important;
+        display:         flex       !important;
+        flex-direction:  column     !important;
+        align-self:      stretch    !important;
+        transform:       translateZ(0);   /* GPU layer — makes overflow clip the iframe */
+        isolation:       isolate;          /* new stacking context — same effect */
     }
 
-    /* Strip inner Plotly chart border/radius — column handles it */
-    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
-    [data-testid="stPlotlyChart"] {
-        border: none !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        margin: 0 !important;
-        background: #ffffff;
+    /* 3. Strip the inner Plotly element's own border/radius; column owns the card */
+    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    div[data-testid="stPlotlyChart"] {
+        border:        none      !important;
+        border-radius: 0         !important;
+        box-shadow:    none      !important;
+        margin:        0         !important;
+        background:    #ffffff;
     }
 
-    /* Right column: flex column so stacked panels fill naturally */
-    [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
-    > [data-testid="stColumn"]:last-child {
-        display: flex !important;
-        flex-direction: column !important;
-        padding: 0 !important;
+    /* 4. Right column: flex column, no extra padding */
+    div[data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"])
+    > div[data-testid="stColumn"]:last-child {
+        display:        flex     !important;
+        flex-direction: column   !important;
+        align-self:     stretch  !important;
+        padding:        0        !important;
     }
     </style>
     """,
