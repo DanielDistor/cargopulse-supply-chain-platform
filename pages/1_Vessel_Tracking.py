@@ -350,7 +350,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 _SCRIPT = """\
 
 // ── Map init ─────────────────────────────────────────────────────────────
-const map = L.map('map', {zoomControl: true}).setView([20, 10], 2);
+const map = L.map('map', {zoomControl: true}).setView([30, 20], 3);
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
@@ -365,48 +365,51 @@ const VSTYLE = {
   Passenger: {color: '#3b82f6', shape: 'circle',    label: 'Passenger (Blue)'},
   Fishing:   {color: '#f97316', shape: 'square',    label: 'Fishing (Orange)'},
   Special:   {color: '#a855f7', shape: 'star',      label: 'Special (Purple)'},
-  Other:     {color: '#64748b', shape: 'triangle',  label: 'Other (Gray)'},
+  Other:     {color: '#334155', shape: 'triangle',  label: 'Other (Gray)'},
 };
 
+const _SHADOW = 'filter="drop-shadow(0 1px 3px rgba(0,0,0,0.55))"';
+
 function svgIcon(shape, color, sz) {
-  sz = sz || 15;
-  const h = (sz / 2).toFixed(2);
-  const e = (sz - 1).toFixed(2);
+  sz = sz || 20;
+  const h  = (sz / 2).toFixed(2);
+  const e  = (sz - 1).toFixed(2);
+  const sh = sz <= 14 ? '' : _SHADOW;   // skip shadow on tiny legend icons
   if (shape === 'triangle')
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
-      `<polygon points="${h},1 ${e},${e} 1,${e}" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" ${sh}>` +
+      `<polygon points="${h},1.5 ${e},${e} 1.5,${e}" fill="${color}" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`;
   if (shape === 'diamond')
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
-      `<polygon points="${h},1 ${e},${h} ${h},${e} 1,${h}" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" ${sh}>` +
+      `<polygon points="${h},1.5 ${e},${h} ${h},${e} 1.5,${h}" fill="${color}" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`;
   if (shape === 'circle')
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
-      `<circle cx="${h}" cy="${h}" r="${(sz/2 - 1.2).toFixed(2)}" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" ${sh}>` +
+      `<circle cx="${h}" cy="${h}" r="${(sz/2 - 1.5).toFixed(2)}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
   if (shape === 'square')
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
-      `<rect x="1.5" y="1.5" width="${sz - 3}" height="${sz - 3}" rx="2" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" ${sh}>` +
+      `<rect x="2" y="2" width="${sz - 4}" height="${sz - 4}" rx="2.5" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
   if (shape === 'star') {
     const pts = [];
-    const cx = sz / 2, cy = sz / 2, ro = sz / 2 - 1.5, ri = ro * 0.42;
+    const cx = sz / 2, cy = sz / 2, ro = sz / 2 - 2, ri = ro * 0.42;
     for (let i = 0; i < 10; i++) {
       const ang = (i * Math.PI / 5) - Math.PI / 2;
       const r = i % 2 === 0 ? ro : ri;
       pts.push(`${(cx + r * Math.cos(ang)).toFixed(2)},${(cy + r * Math.sin(ang)).toFixed(2)}`);
     }
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
-      `<polygon points="${pts.join(' ')}" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/></svg>`;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" ${sh}>` +
+      `<polygon points="${pts.join(' ')}" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
   }
-  return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
-    `<circle cx="${h}" cy="${h}" r="${(sz/2 - 1.2).toFixed(2)}" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`;
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" ${sh}>` +
+    `<circle cx="${h}" cy="${h}" r="${(sz/2 - 1.5).toFixed(2)}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
 }
 
 function makeIcon(category) {
   const s = VSTYLE[category] || VSTYLE.Other;
   return L.divIcon({
-    html: svgIcon(s.shape, s.color, 15),
+    html: svgIcon(s.shape, s.color, 20),
     className: '',
-    iconSize: [15, 15],
-    iconAnchor: [7, 7],
-    popupAnchor: [0, -10],
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -12],
   });
 }
 
