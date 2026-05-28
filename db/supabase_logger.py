@@ -113,6 +113,32 @@ def get_daily_activity(days: int = 7) -> list:
         conn.close()
 
 
+def get_last_24h_activity() -> list:
+    """
+    Returns individual snapshot rows from the last 24 hours, oldest first.
+    Each row dict: {"logged_at": datetime, "total": int}
+    Returns [] if DB is unreachable or no data exists yet.
+    """
+    conn = _connect()
+    if conn is None:
+        return []
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT logged_at AT TIME ZONE 'UTC' AS logged_at, total
+                FROM vessel_activity
+                WHERE logged_at > NOW() - INTERVAL '24 hours'
+                ORDER BY logged_at
+            """)
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
 def get_hourly_activity() -> list:
     """
     Returns up to 24 rows — one per UTC hour — with the average

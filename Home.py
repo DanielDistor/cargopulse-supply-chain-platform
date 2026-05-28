@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from services import aisstream, congestion as cong_svc
 from services.shipping_rates import get_bdi
 from services.news import get_maritime_news
-from db import cache
+from db import cache, supabase_logger
 from components.styles import inject_global_css, navbar
 
 load_dotenv()
@@ -128,6 +128,77 @@ c4.markdown(_kpi("BDI",             bdi_display,                 f"{bdi_chg:+.1f
 # Spacer so KPI row doesn't visually bleed into the panels below
 st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
+# ── Fleet Activity Cards ────────────────────────────────────────────────
+_daily  = supabase_logger.get_daily_activity(7)
+_h24    = supabase_logger.get_last_24h_activity()
+
+_CF = dict(family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+           color="#64748b", size=10)
+_CL = dict(
+    paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", font=_CF,
+    margin=dict(l=36, r=10, t=32, b=24), height=190,
+    xaxis=dict(showgrid=False, zeroline=False, tickfont=_CF,
+               linecolor="#e2e8f0", tickcolor="#e2e8f0"),
+    yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False,
+               tickfont=_CF, linecolor="#e2e8f0"),
+    showlegend=False,
+)
+_PH = (
+    '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
+    'height:190px;display:flex;flex-direction:column;align-items:center;'
+    'justify-content:center;gap:6px;">'
+    '<div style="font-size:26px">{icon}</div>'
+    '<div style="color:#1e293b;font-size:13px;font-weight:700">Collecting Data</div>'
+    '<div style="color:#94a3b8;font-size:11px;text-align:center;max-width:200px">'
+    '{label}<br>Check back in a few hours</div></div>'
+)
+
+_ac_left, _ac_right = st.columns(2)
+
+with _ac_left:
+    if _daily:
+        _fig7 = go.Figure(go.Scatter(
+            x=[str(r["day"]) for r in _daily],
+            y=[float(r["avg_total"]) for r in _daily],
+            mode="lines+markers",
+            line=dict(color="#3b82f6", width=2.5),
+            marker=dict(color="#3b82f6", size=5),
+            fill="tozeroy", fillcolor="rgba(59,130,246,0.08)",
+            hovertemplate="%{x}<br><b>%{y:.0f} vessels</b><extra></extra>",
+        ))
+        _fig7.update_layout(
+            **_CL,
+            title=dict(text="<b>Fleet Activity — Last 7 Days</b>",
+                       font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
+        )
+        st.plotly_chart(_fig7, use_container_width=True, config={"displayModeBar": False})
+    else:
+        st.markdown(_PH.format(icon="📡", label="Fleet Activity — Last 7 Days"),
+                    unsafe_allow_html=True)
+
+with _ac_right:
+    if _h24:
+        _fig24 = go.Figure(go.Scatter(
+            x=[str(r["logged_at"]) for r in _h24],
+            y=[r["total"] for r in _h24],
+            mode="lines",
+            line=dict(color="#22c55e", width=2.5),
+            fill="tozeroy", fillcolor="rgba(34,197,94,0.08)",
+            hovertemplate="%{x}<br><b>%{y} vessels</b><extra></extra>",
+        ))
+        _fig24.update_layout(
+            **_CL,
+            title=dict(text="<b>Fleet Activity — Last 24 Hours</b>",
+                       font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
+            xaxis=dict(**_CL["xaxis"], tickformat="%H:%M"),
+        )
+        st.plotly_chart(_fig24, use_container_width=True, config={"displayModeBar": False})
+    else:
+        st.markdown(_PH.format(icon="🕐", label="Fleet Activity — Last 24 Hours"),
+                    unsafe_allow_html=True)
+
+st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
+
 # ── Main content — rendered as one components.html block ───────────────
 # components.html() renders inside an iframe where we own the full DOM.
 # This is the only reliable way to get border-radius clipping + equal-height
@@ -147,7 +218,7 @@ PORTS_PANEL = (
 TITLE = 'color:#1e293b;font-size:15px;font-weight:700;margin-bottom:2px;'
 
 # ── Build Plotly figure ─────────────────────────────────────────────────
-SECTION_H = 620   # section height; map fills left card, right panels fill right col
+SECTION_H = 500   # section height; map fills left card, right panels fill right col
 
 fig = go.Figure()
 if not df_cong.empty:
@@ -385,102 +456,3 @@ window.addEventListener('load', function() {{
 </html>"""
 
 components.html(section_html, height=SECTION_H + 2, scrolling=False)
-
-# ── Fleet Activity Charts ───────────────────────────────────────────────
-st.markdown('<div style="height:18px;"></div>', unsafe_allow_html=True)
-st.markdown(
-    '<div style="color:#1e293b;font-size:17px;font-weight:800;'
-    'letter-spacing:-0.01em;margin-bottom:12px;">Fleet Activity Analytics</div>',
-    unsafe_allow_html=True,
-)
-
-from db import supabase_logger
-
-daily  = supabase_logger.get_daily_activity(7)
-hourly = supabase_logger.get_hourly_activity()
-
-_CHART_FONT = dict(family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
-                   color="#64748b", size=11)
-_CHART_LAYOUT = dict(
-    paper_bgcolor="#ffffff",
-    plot_bgcolor="#ffffff",
-    font=_CHART_FONT,
-    margin=dict(l=8, r=8, t=36, b=8),
-    height=240,
-    xaxis=dict(showgrid=False, zeroline=False, tickfont=_CHART_FONT,
-               linecolor="#e2e8f0", tickcolor="#e2e8f0"),
-    yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False,
-               tickfont=_CHART_FONT, linecolor="#e2e8f0"),
-)
-
-ch_left, ch_right = st.columns(2)
-
-# ── Chart 1: Fleet activity last 7 days ────────────────────────────────
-with ch_left:
-    with st.container():
-        if daily:
-            labels = [str(r["day"]) for r in daily]
-            values = [float(r["avg_total"]) for r in daily]
-            fig_d = go.Figure(go.Scatter(
-                x=labels, y=values,
-                mode="lines+markers",
-                line=dict(color="#3b82f6", width=2.5),
-                marker=dict(color="#3b82f6", size=6),
-                fill="tozeroy",
-                fillcolor="rgba(59,130,246,0.08)",
-                hovertemplate="%{x}<br><b>%{y:.0f} vessels</b><extra></extra>",
-            ))
-            fig_d.update_layout(
-                **_CHART_LAYOUT,
-                title=dict(text="<b>Fleet Activity — Last 7 Days</b>",
-                           font=dict(color="#1e293b", size=13), x=0, xanchor="left"),
-            )
-            st.plotly_chart(fig_d, use_container_width=True, config={"displayModeBar": False})
-        else:
-            st.markdown(
-                '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
-                'height:240px;display:flex;flex-direction:column;align-items:center;'
-                'justify-content:center;gap:8px;">'
-                '<div style="font-size:28px">📡</div>'
-                '<div style="color:#1e293b;font-size:14px;font-weight:700">Collecting Data</div>'
-                '<div style="color:#94a3b8;font-size:12px;text-align:center;max-width:220px">'
-                'Fleet Activity — Last 7 Days<br>Check back in a few hours</div>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-
-# ── Chart 2: Fleet activity by hour ────────────────────────────────────
-with ch_right:
-    with st.container():
-        if hourly:
-            hours  = [r["hour"] for r in hourly]
-            avgs   = [float(r["avg_total"]) for r in hourly]
-            fig_h = go.Figure(go.Bar(
-                x=hours, y=avgs,
-                marker_color="#3b82f6",
-                marker_line_width=0,
-                opacity=0.85,
-                hovertemplate="Hour %{x}:00<br><b>%{y:.0f} vessels avg</b><extra></extra>",
-            ))
-            fig_h.update_layout(
-                **_CHART_LAYOUT,
-                title=dict(text="<b>Fleet Activity by Hour (UTC)</b>",
-                           font=dict(color="#1e293b", size=13), x=0, xanchor="left"),
-                xaxis=dict(**_CHART_LAYOUT["xaxis"],
-                           tickvals=list(range(0, 24, 3)),
-                           ticktext=[f"{h:02d}:00" for h in range(0, 24, 3)]),
-                bargap=0.25,
-            )
-            st.plotly_chart(fig_h, use_container_width=True, config={"displayModeBar": False})
-        else:
-            st.markdown(
-                '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
-                'height:240px;display:flex;flex-direction:column;align-items:center;'
-                'justify-content:center;gap:8px;">'
-                '<div style="font-size:28px">🕐</div>'
-                '<div style="color:#1e293b;font-size:14px;font-weight:700">Collecting Data</div>'
-                '<div style="color:#94a3b8;font-size:12px;text-align:center;max-width:220px">'
-                'Fleet Activity by Hour<br>Check back in a few hours</div>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
