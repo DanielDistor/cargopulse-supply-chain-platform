@@ -109,8 +109,10 @@ c2.markdown(_kpi("Critical Ports",   str(critical_n),            f"{high_n} high
 c3.markdown(_kpi("Active Alerts",    str(alert_count),           f"${alert_cost:.0f}M exposure",   alert_color, "#ef5350" if alert_count > 0 else "#4caf50"), unsafe_allow_html=True)
 c4.markdown(_kpi("BDI",             str(bdi.get("value", "—")), f"{bdi_chg:+.1f}% · {bdi.get('trend','—').upper()}", bdi_color, bdi_color),            unsafe_allow_html=True)
 
+# Spacer so KPI row doesn't visually bleed into the panels below
+st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
+
 # ── Main content ───────────────────────────────────────────────────────
-# Map height and right-panel height are kept identical so both columns end together.
 MAP_H = 520
 
 map_col, right_col = st.columns([3, 2])
@@ -167,7 +169,7 @@ with map_col:
 with right_col:
     # Row style — sits inside a panel, slightly darker background
     def _row(content: str, mb: bool = True) -> str:
-        m = "margin-bottom:8px;" if mb else ""
+        m = "margin-bottom:12px;" if mb else ""
         return f'<div style="background:#0d1117;border-radius:10px;{m}">{content}</div>'
 
     # ── Panel 1: Top Congested Ports ───────────────────────────────────
@@ -199,15 +201,16 @@ with right_col:
         )
 
     # ── Panel 2: Live Alerts & News ────────────────────────────────────
-    cards_inner = ""
-    cards_added = 0
+    # Collect card HTML into a list so we can apply 12px gap only between
+    # cards (not after the last one) — prevents bottom-of-panel overlap.
+    card_list: list[str] = []
 
     for _, row in df_cong[df_cong["score"] >= 60].head(2).iterrows():
-        if cards_added >= 3:
+        if len(card_list) >= 3:
             break
         sev   = "CRITICAL" if row["score"] >= 86 else "HIGH"
         color = "#c62828"  if sev == "CRITICAL"  else "#ef5350"
-        inner = (
+        card_list.append(
             f'<div style="padding:12px 16px;border-radius:10px;'
             f'background:{color}22;border-left:3px solid {color};">'
             f'<div style="color:{color};font-size:10px;font-weight:700;'
@@ -218,11 +221,9 @@ with right_col:
             f'Congestion {row["score"]}/100 · {row["vessel_count"]} vessels nearby</div>'
             f'</div>'
         )
-        cards_inner += f'<div style="margin-bottom:8px;">{inner}</div>'
-        cards_added += 1
 
-    if bdi.get("trend") == "rising" and cards_added < 3:
-        inner = (
+    if bdi.get("trend") == "rising" and len(card_list) < 3:
+        card_list.append(
             f'<div style="padding:12px 16px;border-radius:10px;'
             f'background:#ffb74d22;border-left:3px solid #ffb74d;">'
             f'<div style="color:#ffb74d;font-size:10px;font-weight:700;'
@@ -232,16 +233,14 @@ with right_col:
             f'Index {bdi.get("value","N/A")} · {bdi_chg:+.1f}% today</div>'
             f'</div>'
         )
-        cards_inner += f'<div style="margin-bottom:8px;">{inner}</div>'
-        cards_added += 1
 
-    for item in get_maritime_news(n=3 - cards_added):
-        if cards_added >= 3:
+    for item in get_maritime_news(n=3 - len(card_list)):
+        if len(card_list) >= 3:
             break
         url_a = f'href="{item["url"]}" target="_blank"' if item.get("url") else ""
-        inner = (
+        card_list.append(
             f'<div style="padding:12px 16px;border-radius:10px;'
-            f'background:#0d1117;border-left:3px solid #00d4ff;">'
+            f'background:#131920;border-left:3px solid #00d4ff;">'
             f'<div style="color:#00d4ff;font-size:10px;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.06em">NEWS</div>'
             f'<a {url_a} style="text-decoration:none;">'
@@ -251,8 +250,12 @@ with right_col:
             f'<div style="color:#5a6a7e;font-size:12px;margin-top:2px">{item["source"]}</div>'
             f'</div>'
         )
-        cards_inner += f'<div style="margin-bottom:8px;">{inner}</div>'
-        cards_added += 1
+
+    # Render: 12px gap between cards, nothing after the last one
+    cards_inner = ""
+    for i, card in enumerate(card_list):
+        mb = "" if i == len(card_list) - 1 else "margin-bottom:12px;"
+        cards_inner += f'<div style="{mb}">{card}</div>'
 
     if not cards_inner:
         cards_inner = (
