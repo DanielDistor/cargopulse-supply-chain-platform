@@ -1,0 +1,29 @@
+name: Log Vessel Activity
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 minutes, 24/7
+  workflow_dispatch:           # manual "Run workflow" button in GitHub UI
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install httpx websockets python-dotenv
+
+      - name: Fetch vessels & log to Supabase
+        env:
+          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:      ${{ secrets.SUPABASE_KEY }}
+        run: python scripts/log_vessels.py

@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import pandas as pd
 from dotenv import load_dotenv
+from streamlit_autorefresh import st_autorefresh
 from services import aisstream, congestion as cong_svc
 from services.shipping_rates import get_bdi
 from services.news import get_maritime_news
@@ -14,6 +15,10 @@ from db import cache, supabase_logger
 from components.styles import inject_global_css, navbar
 
 load_dotenv()
+
+# Auto-refresh every 10 minutes (600 000 ms).
+# Each cycle fetches fresh AIS data and logs a Supabase snapshot.
+st_autorefresh(interval=10 * 60 * 1000, key="dashboard_refresh")
 
 st.set_page_config(
     page_title="Dashboard | CargoPulse",
@@ -176,9 +181,10 @@ with _ac_left:
             hovertemplate="%{x}<br><b>%{y:.0f} vessels</b><extra></extra>",
         ))
         _fig7.update_layout(
-            **_CL,
+            **{k: v for k, v in _CL.items() if k != "xaxis"},
             title=dict(text="<b>Fleet Activity — Last 7 Days</b>",
                        font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
+            xaxis=dict(**_CL["xaxis"], tickformat="%b %d", dtick=86400000),
         )
         st.plotly_chart(_fig7, use_container_width=True, config={"displayModeBar": False})
     else:
@@ -199,7 +205,7 @@ with _ac_right:
             **{k: v for k, v in _CL.items() if k != "xaxis"},
             title=dict(text="<b>Fleet Activity — Last 24 Hours</b>",
                        font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
-            xaxis=dict(**_CL["xaxis"], tickformat="%H:%M"),
+            xaxis=dict(**_CL["xaxis"], tickformat="%H:00", dtick=3600000),
         )
         st.plotly_chart(_fig24, use_container_width=True, config={"displayModeBar": False})
     else:

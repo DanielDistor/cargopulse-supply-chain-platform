@@ -92,7 +92,7 @@ def log_snapshot(total: int) -> None:
     if not base or not key:
         return
     try:
-        since = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
+        since = (datetime.now(timezone.utc) - timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
         r = httpx.get(
             f"{base}/rest/v1/vessel_activity",
             headers=_headers(),
@@ -122,7 +122,7 @@ def get_last_24h_activity() -> list:
     if not base or not _key():
         return []
     try:
-        since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        since = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
         r = httpx.get(
             f"{base}/rest/v1/vessel_activity",
             headers=_headers(),
@@ -147,7 +147,7 @@ def get_daily_activity(days: int = 7) -> list:
     if not base or not _key():
         return []
     try:
-        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
         r = httpx.get(
             f"{base}/rest/v1/vessel_activity",
             headers=_headers(),
