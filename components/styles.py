@@ -5,61 +5,75 @@ def inject_global_css() -> None:
     st.markdown(
         """
         <style>
-        /* ── Page — exact reference: background #f4f7fa, padding 20px ── */
-        .stApp { background-color: #f4f7fa; }
+        /* ────────────────────────────────────────────────────────────────
+           SOURCE: josna-14/Maritime_Vessel_Tracking
+           index.css  +  Dashboard.js inline styles
+           All values copied verbatim — no approximations.
+        ──────────────────────────────────────────────────────────────── */
+
+        /* index.css :root / body */
+        .stApp {
+            background: #f4f7fa;
+            font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #0f1c2e;
+        }
         header[data-testid="stHeader"] { display: none !important; }
+
+        /* .app-container padding: 2rem + block-container override */
         .block-container {
-            padding-top: 0.25rem !important;
+            padding-top: 0 !important;
             padding-bottom: 1.25rem !important;
             padding-left: 1.25rem !important;
             padding-right: 1.25rem !important;
         }
 
-        /* ── Section spacing — denser enterprise feel ── */
-        [data-testid="stVerticalBlock"] { gap: 0.65rem !important; }
-        [data-testid="stHorizontalBlock"] { gap: 1rem !important; }
+        /* index.css .page { gap: 1.5rem }  ← exact */
+        [data-testid="stVerticalBlock"] { gap: 1.5rem !important; }
+
+        /* Dashboard.js main split gap: "25px"  ← exact */
+        [data-testid="stHorizontalBlock"] { gap: 1.5625rem !important; }
 
         /* ── Hide sidebar ── */
         [data-testid="stSidebar"]       { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebarContent"] { display: none !important; }
 
-        /* ── Navbar link hover — exact reference: rgba(255,255,255,0.2) ── */
+        /* Navbar.css .navbar__links a.active / a:hover
+           background: rgba(255,255,255,0.2)  ← exact */
         .cp-nav-link:hover {
             background: rgba(255, 255, 255, 0.2) !important;
             color: #fff !important;
         }
 
-        /* ── Plotly chart — reference panel style ── */
+        /* Plotly chart: Dashboard.js section style
+           borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)"  ← exact */
         [data-testid="stPlotlyChart"] {
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
-        /* ── Dataframes ── */
+        /* Dataframes */
         [data-testid="stDataFrame"] {
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
-        /* ── Dividers ── */
         hr { border-color: #eee !important; margin: 1.5rem 0; }
 
-        /* ── Page titles ── */
+        /* index.css .page__header h1: color #0f1c2e
+           Dashboard.js h1: color "#1f3c88" — inline overrides, use that */
         h1 { color: #1f3c88 !important; font-weight: 700; }
-        h2 { color: #333 !important; font-weight: 700; }
-        h3 { color: #333 !important; font-weight: 600; }
+        h2, h3 { color: #333 !important; font-weight: 600; }
 
-        /* ── Caption ── */
         .stCaption, [data-testid="stCaptionContainer"] p {
-            color: #888 !important;
+            color: #687590 !important;   /* index.css .card__label color */
             font-size: 0.85rem !important;
         }
 
-        /* ── Buttons — reference: #1f3c88 border style ── */
+        /* Buttons — reference Track button style */
         .stButton button {
             background: white;
             color: #1f3c88;
@@ -74,42 +88,46 @@ def inject_global_css() -> None:
             color: white;
         }
 
-        /* ── Spinner ── */
+        /* Spinner */
         .stSpinner > div { border-top-color: #1f3c88 !important; }
 
-        /* ── Info boxes ── */
+        /* index.css .auth__message */
         [data-testid="stInfo"] {
-            background-color: #e3f2fd !important;
-            border: 1px solid #90caf9 !important;
-            border-radius: 8px !important;
+            background-color: #e7f6ff !important;
+            border: 1px solid #b4dcff !important;
+            border-radius: 10px !important;
             color: #1565c0 !important;
         }
 
-        /* ── Warning boxes ── */
         [data-testid="stWarning"] {
-            background-color: #fff3e0 !important;
-            border: 1px solid #ffcc80 !important;
-            border-radius: 8px !important;
+            background-color: #fff8e1 !important;
+            border: 1px solid #fde68a !important;
+            border-radius: 10px !important;
         }
 
-        /* ── Expander ── */
         [data-testid="stExpander"] {
             border: 1px solid #eee !important;
             border-radius: 12px !important;
             background-color: white !important;
         }
 
-        /* ── Selectbox / Multiselect ── */
         [data-testid="stSelectbox"] > div,
         [data-testid="stMultiSelect"] > div {
             background-color: white;
-            border-color: #ddd;
-            border-radius: 8px;
+            border-color: #cbd5ef;
+            border-radius: 10px;
         }
 
-        /* ── Slider ── */
-        [data-testid="stSlider"] [class*="thumb"] { background-color: #1f3c88 !important; }
-        [data-testid="stSlider"] [class*="track"] { background-color: #1f3c88 !important; }
+        /* index.css .filters input border: 1px solid #cbd5ef */
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] {
+            background-color: #e3f2fd !important;
+            border: 1px solid #90caf9 !important;
+        }
+        [data-testid="stMultiSelect"] [data-baseweb="tag"] span { color: #1565c0 !important; }
+
+        /* progress bar: linear-gradient(90deg, #1e3c72, #2a5298) */
+        [data-testid="stSlider"] [class*="thumb"] { background-color: #1e3c72 !important; }
+        [data-testid="stSlider"] [class*="track"]  { background-color: #2a5298 !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -117,7 +135,16 @@ def inject_global_css() -> None:
 
 
 def navbar(current: str = "") -> None:
-    """Navbar — exact reference: linear-gradient(135deg, #1e3c72, #2a5298), box-shadow 0 4px 12px."""
+    """Navbar.css exact values:
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)
+    padding: 1rem 2rem
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15)
+    brand: 1.4rem / 700
+    logo: 2rem
+    links gap: 1.25rem
+    link: color #fff, font-weight 500, padding 0.4rem 0.6rem, border-radius 6px
+    active: background rgba(255,255,255,0.2)
+    """
     _pages = [
         ("Dashboard",        "/"),
         ("Vessel Tracking",  "/Vessel_Tracking"),
@@ -130,13 +157,11 @@ def navbar(current: str = "") -> None:
     links = ""
     for label, path in _pages:
         if label == current:
-            # active: rgba(255,255,255,0.2) background — exact from Navbar.css
             links += (
                 f'<a href="{path}" target="_self" style="'
                 f'color:#fff;text-decoration:none;font-weight:500;'
                 f'padding:0.4rem 0.6rem;border-radius:6px;'
-                f'background:rgba(255,255,255,0.2);'
-                f'white-space:nowrap;">'
+                f'background:rgba(255,255,255,0.2);white-space:nowrap;">'
                 f'{label}</a>'
             )
         else:
@@ -148,13 +173,14 @@ def navbar(current: str = "") -> None:
                 f'{label}</a>'
             )
 
+    # Navbar.css: padding 1rem 2rem, background gradient, box-shadow exact
     st.markdown(
         f"""
         <div style="
             width:100vw;position:relative;left:50%;transform:translateX(-50%);
-            background:linear-gradient(135deg,#182d5c 0%,#1e3870 100%);
-            box-shadow:0 2px 8px rgba(0,0,0,0.18);
-            padding:0 2rem;height:50px;
+            background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);
+            box-shadow:0 4px 12px rgba(0,0,0,0.15);
+            padding:1rem 2rem;
             display:flex;align-items:center;justify-content:space-between;
             box-sizing:border-box;margin-bottom:1.25rem;
         ">
@@ -170,7 +196,7 @@ def navbar(current: str = "") -> None:
 
 
 def page_header(title: str, subtitle: str) -> None:
-    """Render a page header matching reference typography."""
+    """Dashboard.js header: h1 color #1f3c88 24px, p color #666 14px."""
     st.markdown(
         '<div style="margin-bottom:25px;">'
         f'<h1 style="margin:0 0 5px 0;color:#1f3c88;font-size:24px;font-weight:700">{title}</h1>'
