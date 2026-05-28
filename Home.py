@@ -196,7 +196,7 @@ with _ac_right:
             hovertemplate="%{x}<br><b>%{y} vessels</b><extra></extra>",
         ))
         _fig24.update_layout(
-            **_CL,
+            **{k: v for k, v in _CL.items() if k != "xaxis"},
             title=dict(text="<b>Fleet Activity — Last 24 Hours</b>",
                        font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
             xaxis=dict(**_CL["xaxis"], tickformat="%H:%M"),
