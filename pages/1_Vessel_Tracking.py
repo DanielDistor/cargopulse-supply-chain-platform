@@ -1,12 +1,10 @@
 import json
-import math
 import os
 import streamlit as st
-import plotly.express as px
-import plotly.graph_objects as go
+import streamlit.components.v1 as components
 import pandas as pd
 from dotenv import load_dotenv
-from services import aisstream, congestion as cong_svc
+from services import aisstream
 from db import cache
 from components.styles import inject_global_css, page_header, navbar
 
@@ -17,7 +15,7 @@ inject_global_css()
 navbar(current="Vessel Tracking")
 page_header(
     "Live Vessel Tracking",
-    "Vessel positions within ~50 nautical miles of major ports via terrestrial AIS. Color = movement status."
+    "Real-time AIS positions near major ports · vessel types · risk zones",
 )
 
 PORTS_PATH = os.path.join(os.path.dirname(__file__), "..", "db", "ports.json")
@@ -29,33 +27,19 @@ bounding_boxes = [aisstream.make_port_bounding_box(p["lat"], p["lon"]) for p in 
 ANCHORED_STATUSES = {1, 5}
 UNDERWAY_STATUSES = {0, 8}
 
-COLOR_MAP = {
-    "Underway":           "#4caf50",
-    "Slow / Maneuvering": "#ffb74d",
-    "Anchored / Moored":  "#ef5350",
-}
-
-# ── Maritime risk zones ───────────────────────────────────────────────
 RISK_ZONES = [
-    {"name": "Gulf of Aden",     "lat": 12.5,  "lon":  47.5, "radius_km": 450, "type": "Piracy",        "color": "#ef5350"},
-    {"name": "Red Sea Corridor", "lat": 19.0,  "lon":  38.5, "radius_km": 480, "type": "Security",      "color": "#ff7043"},
-    {"name": "Hormuz Strait",    "lat": 26.6,  "lon":  56.3, "radius_km": 100, "type": "Geopolitical",  "color": "#ce93d8"},
-    {"name": "Malacca Strait",   "lat":  3.0,  "lon": 101.5, "radius_km": 160, "type": "Congestion",    "color": "#ffb74d"},
-    {"name": "South China Sea",  "lat": 13.5,  "lon": 113.0, "radius_km": 650, "type": "Congestion",    "color": "#ffb74d"},
-    {"name": "Taiwan Strait",    "lat": 24.5,  "lon": 119.5, "radius_km": 110, "type": "Geopolitical",  "color": "#ce93d8"},
-    {"name": "Suez Canal",       "lat": 30.4,  "lon":  32.4, "radius_km":  90, "type": "Congestion",    "color": "#ffb74d"},
-    {"name": "Panama Canal",     "lat":  9.1,  "lon": -79.7, "radius_km":  75, "type": "Congestion",    "color": "#ffb74d"},
+    {"name": "Gulf of Aden",     "lat": 12.5,  "lon":  47.5, "radius_km": 450, "type": "Piracy"},
+    {"name": "Red Sea Corridor", "lat": 19.0,  "lon":  38.5, "radius_km": 480, "type": "Security"},
+    {"name": "Hormuz Strait",    "lat": 26.6,  "lon":  56.3, "radius_km": 100, "type": "Geopolitical"},
+    {"name": "Malacca Strait",   "lat":  3.0,  "lon": 101.5, "radius_km": 160, "type": "Congestion"},
+    {"name": "South China Sea",  "lat": 13.5,  "lon": 113.0, "radius_km": 650, "type": "Congestion"},
+    {"name": "Taiwan Strait",    "lat": 24.5,  "lon": 119.5, "radius_km": 110, "type": "Geopolitical"},
+    {"name": "Suez Canal",       "lat": 30.4,  "lon":  32.4, "radius_km":  90, "type": "Congestion"},
+    {"name": "Panama Canal",     "lat":  9.1,  "lon": -79.7, "radius_km":  75, "type": "Congestion"},
 ]
 
-ZONE_TYPE_COLOR = {
-    "Piracy":       "#ef5350",
-    "Security":     "#ff7043",
-    "Geopolitical": "#ce93d8",
-    "Congestion":   "#ffb74d",
-}
 
-
-def classify_vessel(row: dict) -> str:
+def classify_movement(row: dict) -> str:
     nav = row.get("status")
     spd = row.get("speed") or 0.0
     if nav in ANCHORED_STATUSES or (nav not in UNDERWAY_STATUSES and spd < 1.0):
@@ -65,33 +49,34 @@ def classify_vessel(row: dict) -> str:
     return "Slow / Maneuvering"
 
 
-def _hex_to_rgba(hex_color: str, alpha: float = 0.12) -> str:
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"rgba({r},{g},{b},{alpha})"
+def get_vessel_category(code=None, name: str = "") -> str:
+    """Classify by AIS type code first, then ship-name keywords as fallback."""
+    if code is not None:
+        try:
+            c = int(code)
+            if 70 <= c <= 79: return "Cargo"
+            if 80 <= c <= 89: return "Tanker"
+            if 60 <= c <= 69: return "Passenger"
+            if c in (30, 31, 32): return "Fishing"
+            if 50 <= c <= 59: return "Special"
+        except (ValueError, TypeError):
+            pass
+    nm = (name or "").upper()
+    if any(k in nm for k in ["TANKER", " OIL", "CRUDE", "LNG", "LPG", "VLCC", "AFRAMAX", "GAS CARRIER"]):
+        return "Tanker"
+    if any(k in nm for k in ["CONTAINER", "CARGO", "BULK", "FREIGHTER", "CARRIER", "COSCO", "EVERGREEN", "MAERSK"]):
+        return "Cargo"
+    if any(k in nm for k in ["FERRY", "PASSENGER", "CRUISE", "LINER"]):
+        return "Passenger"
+    if any(k in nm for k in ["FISH", "TRAWLER", "FISHING"]):
+        return "Fishing"
+    return "Other"
 
 
-def _circle_latlons(lat: float, lon: float, radius_km: float, n: int = 60):
-    lats, lons = [], []
-    for i in range(n + 1):
-        ang = 2 * math.pi * i / n
-        dlat = (radius_km / 111.0) * math.cos(ang)
-        dlon = (radius_km / (111.0 * math.cos(math.radians(lat)))) * math.sin(ang)
-        lats.append(lat + dlat)
-        lons.append(lon + dlon)
-    return lats, lons
-
-
-# ── Inline controls ───────────────────────────────────────────────────
-c1, c2, c3, _, c_btn = st.columns([1.4, 1.4, 1.4, 2.5, 1.5])
-with c1:
-    show_ports = st.toggle("Port congestion rings", value=True)
-with c2:
-    show_risk_zones = st.toggle("Maritime risk zones", value=True)
-with c3:
-    show_weather = st.toggle("Wave height overlay", value=False)
-with c_btn:
-    if st.button("Refresh Data", type="primary", use_container_width=True):
+# ── Refresh button + fetch ─────────────────────────────────────────────
+col_info, col_btn = st.columns([5, 1])
+with col_btn:
+    if st.button("⟳ Refresh", type="primary", use_container_width=True):
         from db.cache import _connect
         with _connect() as conn:
             conn.execute("DELETE FROM cache WHERE key = ?", (aisstream.VESSEL_CACHE_KEY,))
@@ -101,37 +86,45 @@ with st.spinner("Fetching live vessel positions..."):
     vessels = aisstream.get_vessels(bounding_boxes)
 
 age = cache.get_age_seconds(aisstream.VESSEL_CACHE_KEY)
-if age is not None:
-    st.caption(f"Last updated {age // 60}m {age % 60}s ago · **{len(vessels)} vessels** tracked")
-else:
-    st.caption("No cached data yet. Fetching now...")
+with col_info:
+    if age is not None:
+        st.caption(f"🕐 Last updated {age // 60}m {age % 60}s ago · **{len(vessels)} vessels** tracked")
+    else:
+        st.caption("No cached data yet — fetching now…")
 
 if not vessels:
     st.warning("No vessel data available. Check that AISSTREAM_API_KEY is set and try refreshing.")
     st.stop()
 
-df = pd.DataFrame(vessels) if vessels else pd.DataFrame(columns=["lat", "lon", "mmsi", "name", "speed", "heading", "status"])
+# ── Build dataframe ────────────────────────────────────────────────────
+df = pd.DataFrame(vessels)
 if not df.empty and {"lat", "lon"}.issubset(df.columns):
     df = df.dropna(subset=["lat", "lon"])
 else:
     df = df.reindex(columns=["lat", "lon", "mmsi", "name", "speed", "heading", "status"])
-df["category"] = df.apply(classify_vessel, axis=1)
-cat_order = list(COLOR_MAP.keys())
-df["category"] = pd.Categorical(df["category"], categories=cat_order, ordered=True)
-df = df.sort_values("category")
+
+df["movement"] = df.apply(classify_movement, axis=1)
+df["category"] = df.apply(
+    lambda r: get_vessel_category(r.get("vessel_type_code"), r.get("name", "")),
+    axis=1,
+)
 
 total    = len(df)
-underway = int((df["category"] == "Underway").sum())
-slow     = int((df["category"] == "Slow / Maneuvering").sum())
-anchored = int((df["category"] == "Anchored / Moored").sum())
+underway = int((df["movement"] == "Underway").sum())
+slow     = int((df["movement"] == "Slow / Maneuvering").sum())
+anchored = int((df["movement"] == "Anchored / Moored").sum())
 
-# ── Fleet stats row — uniform fixed-height cards ──────────────────────
+# ── Fleet stat cards (dark) ─────────────────────────────────────────────
 def fleet_card(label: str, value: int, pct: float, dot_color: str) -> str:
-    dot = f'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{dot_color};margin-right:6px;vertical-align:middle;flex-shrink:0"></span>'
+    dot = (
+        f'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
+        f'background:{dot_color};margin-right:6px;vertical-align:middle;flex-shrink:0"></span>'
+    )
     return (
         f'<div style="background:#1a1f2e;border:1px solid #263044;border-radius:10px;'
         f'padding:16px 18px;height:96px;display:flex;flex-direction:column;justify-content:space-between;">'
-        f'<div style="display:flex;align-items:center;color:#6b7fa3;font-size:11px;text-transform:uppercase;letter-spacing:.07em">{dot}{label}</div>'
+        f'<div style="display:flex;align-items:center;color:#6b7fa3;font-size:11px;'
+        f'text-transform:uppercase;letter-spacing:.07em">{dot}{label}</div>'
         f'<div style="color:#e8eaed;font-size:26px;font-weight:800;line-height:1">{value}</div>'
         f'<div style="color:{dot_color};font-size:12px">{pct:.0f}% of fleet</div>'
         f'</div>'
@@ -147,128 +140,339 @@ s1.markdown(
     f'</div>',
     unsafe_allow_html=True,
 )
-s2.markdown(fleet_card("Underway",           underway, underway/total*100  if total else 0, "#4caf50"), unsafe_allow_html=True)
-s3.markdown(fleet_card("Slow / Maneuvering", slow,     slow/total*100      if total else 0, "#ffb74d"), unsafe_allow_html=True)
-s4.markdown(fleet_card("Anchored / Moored",  anchored, anchored/total*100  if total else 0, "#ef5350"), unsafe_allow_html=True)
+s2.markdown(fleet_card("Underway",           underway, underway / total * 100 if total else 0, "#4caf50"), unsafe_allow_html=True)
+s3.markdown(fleet_card("Slow / Maneuvering", slow,     slow / total * 100     if total else 0, "#ffb74d"), unsafe_allow_html=True)
+s4.markdown(fleet_card("Anchored / Moored",  anchored, anchored / total * 100 if total else 0, "#ef5350"), unsafe_allow_html=True)
 
-st.divider()
+st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
-# ── Inline legend ─────────────────────────────────────────────────────
-leg_html = '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;padding:4px 0;margin-bottom:6px;">'
-leg_html += '<span style="color:#5a6a7e;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Vessels</span>'
-for label, color in COLOR_MAP.items():
-    leg_html += (
-        f'<div style="display:flex;align-items:center;gap:6px;">'
-        f'<div style="width:9px;height:9px;border-radius:50%;background:{color};flex-shrink:0"></div>'
-        f'<span style="color:#a0aab4;font-size:12px">{label}</span>'
-        f'</div>'
-    )
-if show_risk_zones:
-    leg_html += '<span style="color:#263044;margin:0 8px">|</span>'
-    leg_html += '<span style="color:#5a6a7e;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Risk Zones</span>'
-    for rtype, rcolor in ZONE_TYPE_COLOR.items():
-        leg_html += (
-            f'<div style="display:flex;align-items:center;gap:6px;">'
-            f'<div style="width:9px;height:9px;border-radius:2px;background:{rcolor};opacity:0.85;flex-shrink:0"></div>'
-            f'<span style="color:#a0aab4;font-size:12px">{rtype}</span>'
-            f'</div>'
-        )
-leg_html += '</div>'
-st.markdown(leg_html, unsafe_allow_html=True)
-
-# ── Full-width map ────────────────────────────────────────────────────
-fig = px.scatter_mapbox(
-    df, lat="lat", lon="lon",
-    color="category",
-    color_discrete_map=COLOR_MAP,
-    category_orders={"category": cat_order},
-    hover_name="name",
-    hover_data={
-        "mmsi": True, "speed": True, "heading": True,
-        "category": True, "lat": False, "lon": False,
-    },
-    zoom=1, height=580,
-    mapbox_style="carto-darkmatter",
-)
-fig.update_traces(marker=dict(size=6, opacity=0.9))
-fig.update_layout(
-    margin={"r": 0, "t": 0, "l": 0, "b": 0},
-    paper_bgcolor="#1a1f2e",
-    showlegend=False,
-)
-
-# Risk zones go behind vessels (prepend traces)
-if show_risk_zones:
-    risk_traces = []
-    for zone in RISK_ZONES:
-        clat, clon = _circle_latlons(zone["lat"], zone["lon"], zone["radius_km"])
-        risk_traces.append(go.Scattermapbox(
-            lat=clat, lon=clon,
-            mode="lines",
-            fill="toself",
-            fillcolor=_hex_to_rgba(zone["color"], 0.10),
-            line=dict(color=zone["color"], width=1.2),
-            showlegend=False,
-            hovertemplate=f"<b>{zone['name']}</b><br>Type: {zone['type']}<br>Radius: ~{zone['radius_km']} km<extra></extra>",
-        ))
-        risk_traces.append(go.Scattermapbox(
-            lat=[zone["lat"]], lon=[zone["lon"]],
-            mode="text",
-            text=[zone["name"]],
-            textposition="middle center",
-            textfont=dict(color=zone["color"], size=9),
-            showlegend=False,
-            hoverinfo="skip",
-        ))
-    fig = go.Figure(data=risk_traces + list(fig.data), layout=fig.layout)
-
-if show_ports:
-    with st.spinner("Loading port congestion rings..."):
-        congestion_data = cong_svc.get_all_port_congestion(vessels)
-    cong_map       = {c["name"]: c for c in congestion_data}
-    port_color_map = {"Clear": "#4caf50", "Moderate": "#ffb74d", "High": "#ef5350", "Critical": "#b71c1c"}
-    for port in ports:
-        cong  = cong_map.get(port["name"], {})
-        score = cong.get("score", 0)
-        label = cong.get("label", "Clear")
-        fig.add_trace(go.Scattermapbox(
-            lat=[port["lat"]], lon=[port["lon"]],
-            mode="markers",
-            marker=dict(size=max(10, score / 4 + 8), color=port_color_map.get(label, "#9e9e9e"), opacity=0.4),
-            showlegend=False,
-            hovertemplate=(
-                f"<b>{port['name']}</b> (port)<br>"
-                f"Congestion: {score}/100 — {label}<br>"
-                f"Vessels nearby: {cong.get('vessel_count', 0)}<extra></extra>"
-            ),
-        ))
-
-if show_weather and ports:
+# ── Prepare map data ────────────────────────────────────────────────────
+def _safe_float(v):
     try:
-        from services import weather as weather_svc
-        wx_lats, wx_lons, wx_heights = [], [], []
-        for p in ports[::5]:
-            w = weather_svc.get_marine_weather(p["lat"], p["lon"])
-            if w.get("wave_height_m") is not None:
-                wx_lats.append(p["lat"]); wx_lons.append(p["lon"]); wx_heights.append(w["wave_height_m"])
-        if wx_lats:
-            fig.add_trace(go.Scattermapbox(
-                lat=wx_lats, lon=wx_lons, mode="markers",
-                marker=dict(size=14, color=wx_heights, colorscale="Blues",
-                            showscale=True, colorbar=dict(title="Wave (m)"), opacity=0.5),
-                name="Wave height", showlegend=False,
-                hovertemplate="Wave: %{marker.color:.1f} m<extra></extra>",
-            ))
-    except ImportError:
-        st.warning("Weather service is not available.")
+        f = float(v)
+        return None if f != f else round(f, 2)   # NaN → None
+    except (TypeError, ValueError):
+        return None
 
-st.plotly_chart(fig, use_container_width=True)
+def _safe_int(v):
+    try:
+        i = int(float(v))
+        return None if i == 511 else i   # 511 = heading not available in AIS
+    except (TypeError, ValueError):
+        return None
+
+vessels_for_map = [
+    {
+        "lat":      float(row["lat"]),
+        "lon":      float(row["lon"]),
+        "name":     str(row.get("name") or "Unknown"),
+        "mmsi":     str(row.get("mmsi") or ""),
+        "speed":    _safe_float(row.get("speed")),
+        "heading":  _safe_int(row.get("heading")),
+        "category": str(row["category"]),
+        "movement": str(row["movement"]),
+    }
+    for _, row in df.iterrows()
+]
+
+ports_for_map = [{"name": p["name"], "lat": p["lat"], "lon": p["lon"]} for p in ports]
+
+MAP_H = 640
+
+# ── Data injection (f-string, isolated from JS template) ───────────────
+_DATA_JS = (
+    f"const VESSELS = {json.dumps(vessels_for_map)};\n"
+    f"const PORTS_DATA = {json.dumps(ports_for_map)};\n"
+    f"const RISK_ZONES = {json.dumps(RISK_ZONES)};\n"
+)
+
+# ── HTML template (no f-string — avoids JS {{ }} escaping) ─────────────
+_HTML_HEAD = """\
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+#map{width:100%;height:100%;}
+
+/* ── Status bar ── */
+#status-bar{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  background:rgba(15,23,42,0.88);color:#f1f5f9;
+  border-radius:22px;padding:7px 20px;
+  font-size:12px;font-weight:600;letter-spacing:.02em;
+  display:flex;align-items:center;gap:14px;
+  z-index:1000;backdrop-filter:blur(6px);
+  box-shadow:0 2px 10px rgba(0,0,0,0.25);white-space:nowrap;
+}
+.sdot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle;}
+
+/* ── Filter panel ── */
+#filter-panel{
+  position:absolute;top:14px;right:14px;
+  background:white;border-radius:10px;padding:12px 14px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.13);z-index:1000;min-width:172px;
+}
+.fp-hdr{font-size:11px;font-weight:700;color:#1e293b;
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.live-pill{background:#22c55e;color:white;font-size:9px;font-weight:700;
+  border-radius:4px;padding:2px 6px;letter-spacing:.05em;}
+#fleet-select{
+  width:100%;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;
+  font-size:12px;color:#334155;cursor:pointer;margin-bottom:9px;
+}
+.fp-row{display:flex;align-items:center;gap:7px;}
+.fp-row label{font-size:12px;color:#475569;cursor:pointer;}
+.fp-row input{cursor:pointer;}
+
+/* ── Legend ── */
+#legend{
+  position:absolute;bottom:28px;right:14px;
+  background:white;border-radius:10px;padding:12px 14px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.13);z-index:1000;min-width:160px;
+}
+.lg-hdr{font-size:12px;font-weight:700;color:#1e293b;margin-bottom:9px;}
+.lg-row{display:flex;align-items:center;gap:9px;margin-bottom:6px;}
+.lg-row:last-child{margin-bottom:0;}
+.lg-lbl{font-size:11px;color:#475569;}
+
+/* ── Popup ── */
+.leaflet-popup-content-wrapper{
+  border-radius:10px!important;
+  box-shadow:0 4px 20px rgba(0,0,0,0.14)!important;
+  padding:0!important;
+}
+.leaflet-popup-content{margin:0!important;}
+.leaflet-popup-tip-container{display:none!important;}
+.pu{padding:12px 14px;min-width:175px;}
+.pu-name{font-size:13px;font-weight:700;color:#1e293b;margin-bottom:7px;}
+.pu-row{display:flex;justify-content:space-between;font-size:11px;
+  color:#64748b;margin-bottom:3px;}
+.pu-val{color:#334155;font-weight:600;}
+.pu-badge{display:inline-block;padding:2px 7px;border-radius:4px;
+  font-size:10px;font-weight:700;margin-top:5px;}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="status-bar">
+  <span><span class="sdot" style="background:#22c55e;"></span><b id="cnt-active">0</b> Active</span>
+  <span style="color:#475569">·</span>
+  <span><span class="sdot" style="background:#ef4444;"></span><b id="cnt-risk">0</b> in Risk Zones</span>
+</div>
+
+<div id="filter-panel">
+  <div class="fp-hdr">Filters <span class="live-pill">● LIVE</span></div>
+  <select id="fleet-select" onchange="applyFilter()">
+    <option value="all">Show All Fleets</option>
+    <option value="Cargo">Cargo</option>
+    <option value="Tanker">Tanker</option>
+    <option value="Passenger">Passenger</option>
+    <option value="Fishing">Fishing</option>
+    <option value="Special">Special</option>
+    <option value="Other">Other</option>
+  </select>
+  <div class="fp-row">
+    <input type="checkbox" id="chk-risk" checked onchange="toggleRisk()">
+    <label for="chk-risk">Show Risk Zones</label>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="lg-hdr">Vessel Types</div>
+</div>
+
+<script>
+"""
+
+_SCRIPT = """\
+
+// ── Map init ─────────────────────────────────────────────────────────────
+const map = L.map('map', {zoomControl: true}).setView([20, 10], 2);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19,
+}).addTo(map);
+
+// ── Vessel styles ─────────────────────────────────────────────────────────
+const VSTYLE = {
+  Cargo:     {color: '#22c55e', shape: 'triangle',  label: 'Cargo (Green)'},
+  Tanker:    {color: '#ef4444', shape: 'diamond',   label: 'Tanker (Red)'},
+  Passenger: {color: '#3b82f6', shape: 'circle',    label: 'Passenger (Blue)'},
+  Fishing:   {color: '#f97316', shape: 'square',    label: 'Fishing (Orange)'},
+  Special:   {color: '#a855f7', shape: 'star',      label: 'Special (Purple)'},
+  Other:     {color: '#64748b', shape: 'triangle',  label: 'Other (Gray)'},
+};
+
+function svgIcon(shape, color, sz) {
+  sz = sz || 15;
+  const h = (sz / 2).toFixed(2);
+  const e = (sz - 1).toFixed(2);
+  if (shape === 'triangle')
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
+      `<polygon points="${h},1 ${e},${e} 1,${e}" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  if (shape === 'diamond')
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
+      `<polygon points="${h},1 ${e},${h} ${h},${e} 1,${h}" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  if (shape === 'circle')
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
+      `<circle cx="${h}" cy="${h}" r="${(sz/2 - 1.2).toFixed(2)}" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`;
+  if (shape === 'square')
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
+      `<rect x="1.5" y="1.5" width="${sz - 3}" height="${sz - 3}" rx="2" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`;
+  if (shape === 'star') {
+    const pts = [];
+    const cx = sz / 2, cy = sz / 2, ro = sz / 2 - 1.5, ri = ro * 0.42;
+    for (let i = 0; i < 10; i++) {
+      const ang = (i * Math.PI / 5) - Math.PI / 2;
+      const r = i % 2 === 0 ? ro : ri;
+      pts.push(`${(cx + r * Math.cos(ang)).toFixed(2)},${(cy + r * Math.sin(ang)).toFixed(2)}`);
+    }
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
+      `<polygon points="${pts.join(' ')}" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/></svg>`;
+  }
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">` +
+    `<circle cx="${h}" cy="${h}" r="${(sz/2 - 1.2).toFixed(2)}" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`;
+}
+
+function makeIcon(category) {
+  const s = VSTYLE[category] || VSTYLE.Other;
+  return L.divIcon({
+    html: svgIcon(s.shape, s.color, 15),
+    className: '',
+    iconSize: [15, 15],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -10],
+  });
+}
+
+// ── Movement badge ────────────────────────────────────────────────────────
+const MOV_COLOR = {'Underway': '#22c55e', 'Slow / Maneuvering': '#f59e0b', 'Anchored / Moored': '#ef4444'};
+function movBadge(mv) {
+  const c = MOV_COLOR[mv] || '#64748b';
+  return `<span class="pu-badge" style="background:${c}18;color:${c};">${mv}</span>`;
+}
+
+// ── Popup HTML ─────────────────────────────────────────────────────────────
+function popupHtml(v) {
+  const spd = v.speed  != null ? v.speed + ' kn' : 'N/A';
+  const hdg = v.heading != null ? v.heading + '°' : 'N/A';
+  return `<div class="pu">
+    <div class="pu-name">${v.name || 'Unknown'}</div>
+    <div class="pu-row"><span>MMSI</span><span class="pu-val">${v.mmsi}</span></div>
+    <div class="pu-row"><span>Type</span><span class="pu-val">${v.category}</span></div>
+    <div class="pu-row"><span>Speed</span><span class="pu-val">${spd}</span></div>
+    <div class="pu-row"><span>Heading</span><span class="pu-val">${hdg}</span></div>
+    ${movBadge(v.movement)}
+  </div>`;
+}
+
+// ── Add vessel markers ─────────────────────────────────────────────────────
+const vesselLayer = L.layerGroup().addTo(map);
+const allMarkers = VESSELS.map(function(v) {
+  const m = L.marker([v.lat, v.lon], {icon: makeIcon(v.category)})
+    .bindPopup(popupHtml(v), {maxWidth: 220});
+  return {m, cat: v.category, lat: v.lat, lon: v.lon};
+});
+allMarkers.forEach(function(o) { vesselLayer.addLayer(o.m); });
+
+// ── Risk zones ─────────────────────────────────────────────────────────────
+const riskLayer = L.layerGroup().addTo(map);
+const RCOL = {Piracy:'#ef5350', Security:'#ff7043', Geopolitical:'#a855f7', Congestion:'#f59e0b'};
+
+RISK_ZONES.forEach(function(z) {
+  const c = RCOL[z.type] || '#94a3b8';
+  L.circle([z.lat, z.lon], {
+    radius: z.radius_km * 1000,
+    color: c, fillColor: c, fillOpacity: 0.07,
+    weight: 1.5, dashArray: '5 5',
+  }).bindTooltip(`<b>${z.name}</b><br>${z.type} · ${z.radius_km} km radius`, {sticky: true})
+    .addTo(riskLayer);
+  L.marker([z.lat, z.lon], {
+    icon: L.divIcon({
+      html: `<span style="color:${c};font-size:9px;font-weight:700;
+               white-space:nowrap;text-shadow:0 0 3px white,0 0 3px white,0 0 3px white;">${z.name}</span>`,
+      className: '',
+      iconAnchor: [30, 6],
+    }),
+    interactive: false,
+  }).addTo(riskLayer);
+});
+
+// ── Haversine (km) ────────────────────────────────────────────────────────
+function hvKm(la1, lo1, la2, lo2) {
+  const R = 6371, dL = (la2-la1)*Math.PI/180, dN = (lo2-lo1)*Math.PI/180;
+  const a = Math.sin(dL/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function inRisk(lat, lon) {
+  return RISK_ZONES.some(z => hvKm(lat, lon, z.lat, z.lon) <= z.radius_km);
+}
+
+// ── Update status bar ─────────────────────────────────────────────────────
+function updateCounts(filter) {
+  let active = 0, risks = 0;
+  allMarkers.forEach(function(o) {
+    const visible = filter === 'all' || o.cat === filter;
+    if (visible) { active++; if (inRisk(o.lat, o.lon)) risks++; }
+  });
+  document.getElementById('cnt-active').textContent = active;
+  document.getElementById('cnt-risk').textContent   = risks;
+}
+
+// ── Filter ────────────────────────────────────────────────────────────────
+function applyFilter() {
+  const f = document.getElementById('fleet-select').value;
+  vesselLayer.clearLayers();
+  allMarkers.forEach(function(o) {
+    if (f === 'all' || o.cat === f) vesselLayer.addLayer(o.m);
+  });
+  updateCounts(f);
+}
+
+function toggleRisk() {
+  document.getElementById('chk-risk').checked ? map.addLayer(riskLayer) : map.removeLayer(riskLayer);
+}
+
+// ── Legend ────────────────────────────────────────────────────────────────
+const legendEl = document.getElementById('legend');
+Object.entries(VSTYLE).forEach(function([cat, s]) {
+  const row = document.createElement('div');
+  row.className = 'lg-row';
+  row.innerHTML = svgIcon(s.shape, s.color, 13) + `<span class="lg-lbl">${s.label}</span>`;
+  legendEl.appendChild(row);
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+updateCounts('all');
+</script>
+</body>
+</html>
+"""
+
+map_html = _HTML_HEAD + _DATA_JS + _SCRIPT
+components.html(map_html, height=MAP_H, scrolling=False)
 
 st.divider()
 
-# ── Vessel table ──────────────────────────────────────────────────────
-st.markdown('<div style="color:#e8eaed;font-size:15px;font-weight:700;margin-bottom:8px;">All Vessels</div>', unsafe_allow_html=True)
-display_df = df[["name", "category", "speed", "heading"]].copy()
-display_df.columns = ["Vessel", "Status", "Speed (kn)", "Heading"]
-st.dataframe(display_df.sort_values("Speed (kn)", ascending=False),
-             use_container_width=True, height=320, hide_index=True)
+# ── Vessel table ────────────────────────────────────────────────────────
+st.markdown(
+    '<div style="color:#1e293b;font-size:15px;font-weight:700;margin-bottom:8px;">All Vessels</div>',
+    unsafe_allow_html=True,
+)
+display_df = df[["name", "category", "movement", "speed", "heading"]].copy()
+display_df.columns = ["Vessel", "Type", "Status", "Speed (kn)", "Heading"]
+st.dataframe(
+    display_df.sort_values("Speed (kn)", ascending=False),
+    use_container_width=True,
+    height=320,
+    hide_index=True,
+)

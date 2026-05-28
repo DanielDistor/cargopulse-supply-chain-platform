@@ -64,7 +64,8 @@ def _make_bbox(lat: float, lon: float, radius: float = 0.5) -> list:
 BOUNDING_BOXES = [_make_bbox(p["lat"], p["lon"]) for p in _PORTS]
 
 # ── State ───────────────────────────────────────────────────────────────
-_vessels: dict[str, dict] = {}   # mmsi → latest vessel dict
+_vessels: dict[str, dict] = {}      # mmsi → latest position dict
+_vessel_types: dict[str, int] = {}  # mmsi → AIS vessel type code
 _running: bool = True
 
 
@@ -80,31 +81,52 @@ signal.signal(signal.SIGTERM, _stop)
 
 # ── Parse AISstream message ─────────────────────────────────────────────
 def _parse(raw: str) -> dict | None:
+    """
+    Handles both PositionReport and ShipStaticData messages.
+    Returns a vessel dict for position reports, or None for static-data-only updates
+    (static data is stored directly into _vessel_types as a side-effect).
+    """
     try:
-        msg = json.loads(raw)
-        if msg.get("MessageType") != "PositionReport":
-            return None
-        meta = msg["MetaData"]
-        pos  = msg["Message"]["PositionReport"]
-        return {
-            "mmsi":      str(meta.get("MMSI", "")),
-            "name":      meta.get("ShipName", "Unknown").strip(),
-            "lat":       pos.get("Latitude"),
-            "lon":       pos.get("Longitude"),
-            "speed":     pos.get("Sog"),
-            "heading":   pos.get("TrueHeading"),
-            "status":    pos.get("NavigationalStatus"),
-            "timestamp": meta.get("time_utc", ""),
-        }
-    except (KeyError, TypeError, json.JSONDecodeError):
-        return None
+        msg      = json.loads(raw)
+        msg_type = msg.get("MessageType")
+        meta     = msg.get("MetaData", {})
+        mmsi     = str(meta.get("MMSI", ""))
+
+        if msg_type == "PositionReport":
+            pos = msg["Message"]["PositionReport"]
+            return {
+                "mmsi":      mmsi,
+                "name":      meta.get("ShipName", "Unknown").strip(),
+                "lat":       pos.get("Latitude"),
+                "lon":       pos.get("Longitude"),
+                "speed":     pos.get("Sog"),
+                "heading":   pos.get("TrueHeading"),
+                "status":    pos.get("NavigationalStatus"),
+                "timestamp": meta.get("time_utc", ""),
+            }
+
+        if msg_type in ("ShipStaticData", "ClassBCSStaticData"):
+            static = msg["Message"].get(msg_type, {})
+            type_code = static.get("Type")
+            if mmsi and type_code is not None:
+                _vessel_types[mmsi] = int(type_code)
+            return None   # no position update, just stored type
+
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+    return None
 
 
 # ── Flush vessels to SQLite ─────────────────────────────────────────────
 def _flush() -> None:
-    vessel_list = list(_vessels.values())
+    vessel_list = []
+    for mmsi, v in _vessels.items():
+        entry = dict(v)
+        if mmsi in _vessel_types:
+            entry["vessel_type_code"] = _vessel_types[mmsi]
+        vessel_list.append(entry)
     cache.set(VESSEL_CACHE_KEY, {"vessels": vessel_list})
-    log.info(f"Cache updated — {len(vessel_list)} unique vessels stored.")
+    log.info(f"Cache updated — {len(vessel_list)} vessels ({len(_vessel_types)} with type codes).")
 
 
 # ── Core streaming coroutine ────────────────────────────────────────────
@@ -112,7 +134,7 @@ async def _stream(api_key: str) -> None:
     subscription = {
         "APIKey":             api_key,
         "BoundingBoxes":      BOUNDING_BOXES,
-        "FilterMessageTypes": ["PositionReport"],
+        "FilterMessageTypes": ["PositionReport", "ShipStaticData", "ClassBCSStaticData"],
     }
 
     async with websockets.connect(
