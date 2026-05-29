@@ -158,7 +158,8 @@ def get_daily_distinct_vessels(days: int = 7) -> list:
     Returns one row per calendar day: count of distinct vessels seen that day.
     Each row dict: {"day": "2024-05-28", "vessel_count": int}
 
-    Uses Range header to override Supabase's default 1000-row cap.
+    Calls the server-side RPC function get_daily_vessel_counts() which does
+    GROUP BY in Postgres — avoids the PostgREST row-count cap entirely.
     """
     if not _HTTPX_OK:
         return []
@@ -166,23 +167,19 @@ def get_daily_distinct_vessels(days: int = 7) -> list:
     if not base or not _key():
         return []
     try:
-        since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
-        # Range: 0-49999 overrides the default 1000-row server cap
-        r = httpx.get(
-            f"{base}/rest/v1/vessel_daily",
-            headers=_headers({"Range": "0-49999"}),
-            params={"select": "day",
-                    "day":    f"gte.{since}"},
+        r = httpx.post(
+            f"{base}/rest/v1/rpc/get_daily_vessel_counts",
+            headers=_headers(),
+            json={"days_back": days},
             timeout=15,
         )
-        if r.status_code not in (200, 206):
+        if r.status_code not in (200, 201):
             return []
-        buckets: dict = defaultdict(int)
-        for row in r.json():
-            buckets[row["day"]] += 1
+        rows = r.json()
+        # RPC returns [{"day": "2024-05-28", "vessel_count": 1234}, ...]
         return [
-            {"day": day, "vessel_count": count}
-            for day, count in sorted(buckets.items())
+            {"day": row["day"], "vessel_count": int(row["vessel_count"])}
+            for row in rows
         ]
     except Exception:
         return []
