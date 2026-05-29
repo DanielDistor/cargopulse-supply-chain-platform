@@ -120,11 +120,17 @@ def log_snapshot(total: int) -> None:
 
 def log_vessel_mmsis(mmsis: list) -> None:
     """
-    Record distinct vessel MMSIs seen today into vessel_daily.
+    Replace today's vessel records with the current snapshot's MMSIs.
 
-    Uses database-level ON CONFLICT DO NOTHING (resolution=ignore-duplicates)
-    so the PRIMARY KEY (mmsi, day) handles dedup atomically — no Python-side
-    GET + filter needed, and no 1000-row cap to worry about.
+    WHY replace instead of accumulate:
+      Each 15-second AIS window only catches vessels that happened to broadcast
+      in those 15 seconds. Across 50 port bounding boxes, that's ~300-400 per
+      run. If we accumulate all runs, the daily count grows by 300+ every
+      5 minutes and hits thousands by end-of-day — not a useful metric.
+
+      Instead, each run wipes today's rows and re-inserts the current snapshot,
+      so the chart always shows "vessels tracked right now" (~300-400), which
+      is stable and meaningful for a 7-day trend line.
     """
     if not _HTTPX_OK or not mmsis:
         return
@@ -136,8 +142,23 @@ def log_vessel_mmsis(mmsis: list) -> None:
     if not rows:
         return
 
-    # resolution=ignore-duplicates → INSERT ... ON CONFLICT DO NOTHING
-    # PostgREST uses the table's PRIMARY KEY (mmsi, day) automatically.
+    # Step 1 — wipe today's rows so this snapshot replaces the previous one
+    try:
+        del_r = httpx.delete(
+            f"{base}/rest/v1/vessel_daily",
+            headers=_headers(),
+            params={"day": f"eq.{today}"},
+            timeout=10,
+        )
+        if del_r.status_code not in (200, 204):
+            print(f"vessel_daily delete error: HTTP {del_r.status_code} — {del_r.text[:200]}")
+            return  # don't insert if delete failed — would create duplicates
+    except Exception as e:
+        print(f"vessel_daily delete exception: {e}")
+        return
+
+    # Step 2 — insert this snapshot's MMSIs in 500-row batches
+    # ON CONFLICT DO NOTHING guards against any rare concurrent run
     hdrs = _headers({"Prefer": "resolution=ignore-duplicates,return=minimal"})
     for i in range(0, len(rows), 500):
         try:
