@@ -120,17 +120,15 @@ def log_snapshot(total: int) -> None:
 
 def log_vessel_mmsis(mmsis: list) -> None:
     """
-    Replace today's vessel records with the current snapshot's MMSIs.
+    Accumulate distinct vessel MMSIs into vessel_daily for today.
 
-    WHY replace instead of accumulate:
-      Each 15-second AIS window only catches vessels that happened to broadcast
-      in those 15 seconds. Across 50 port bounding boxes, that's ~300-400 per
-      run. If we accumulate all runs, the daily count grows by 300+ every
-      5 minutes and hits thousands by end-of-day — not a useful metric.
+    Each run inserts its MMSIs. The PRIMARY KEY (mmsi, day) with
+    ON CONFLICT DO NOTHING ensures a ship already seen today is never
+    double-counted — only brand-new MMSIs from this snapshot are added.
 
-      Instead, each run wipes today's rows and re-inserts the current snapshot,
-      so the chart always shows "vessels tracked right now" (~300-400), which
-      is stable and meaningful for a 7-day trend line.
+    Result: vessel_daily grows throughout the day as new ships come into
+    range, and the 7-day chart shows the running total of distinct ships
+    seen per day across all snapshots.
     """
     if not _HTTPX_OK or not mmsis:
         return
@@ -142,23 +140,8 @@ def log_vessel_mmsis(mmsis: list) -> None:
     if not rows:
         return
 
-    # Step 1 — wipe today's rows so this snapshot replaces the previous one
-    try:
-        del_r = httpx.delete(
-            f"{base}/rest/v1/vessel_daily",
-            headers=_headers(),
-            params={"day": f"eq.{today}"},
-            timeout=10,
-        )
-        if del_r.status_code not in (200, 204):
-            print(f"vessel_daily delete error: HTTP {del_r.status_code} — {del_r.text[:200]}")
-            return  # don't insert if delete failed — would create duplicates
-    except Exception as e:
-        print(f"vessel_daily delete exception: {e}")
-        return
-
-    # Step 2 — insert this snapshot's MMSIs in 500-row batches
-    # ON CONFLICT DO NOTHING guards against any rare concurrent run
+    # resolution=ignore-duplicates → INSERT ... ON CONFLICT DO NOTHING
+    # PostgREST uses the table's PRIMARY KEY (mmsi, day) automatically.
     hdrs = _headers({"Prefer": "resolution=ignore-duplicates,return=minimal"})
     for i in range(0, len(rows), 500):
         try:
