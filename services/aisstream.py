@@ -8,7 +8,7 @@ from db import cache
 
 AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream"
 VESSEL_CACHE_KEY = "vessels_snapshot"
-TTL = 15 * 60  # 15 minutes
+TTL = 5 * 60   # 5 minutes
 
 
 def make_port_bounding_box(lat: float, lon: float, radius_deg: float = 0.5) -> list:

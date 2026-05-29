@@ -24,7 +24,7 @@ st.set_page_config(
 )
 
 # Auto-refresh every 10 minutes — must come after set_page_config.
-st_autorefresh(interval=10 * 60 * 1000, key="dashboard_refresh")
+st_autorefresh(interval=5 * 60 * 1000, key="dashboard_refresh")
 
 inject_global_css()
 navbar(current="Dashboard")
