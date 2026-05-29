@@ -147,7 +147,7 @@ def log_vessel_mmsis(mmsis: list) -> None:
                 json=rows[i : i + 500],
                 timeout=15,
             )
-            if r.status_code not in (200, 201):
+            if r.status_code not in (200, 201, 204):
                 print(f"vessel_daily insert error: HTTP {r.status_code} — {r.text[:200]}")
         except Exception as e:
             print(f"vessel_daily insert exception: {e}")

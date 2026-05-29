@@ -4,6 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 from dotenv import load_dotenv
+from streamlit_autorefresh import st_autorefresh
 from services import aisstream
 from db import cache
 from components.styles import inject_global_css, page_header, navbar
@@ -11,6 +12,7 @@ from components.styles import inject_global_css, page_header, navbar
 load_dotenv()
 
 st.set_page_config(page_title="Vessel Tracking | CargoPulse", layout="wide")
+st_autorefresh(interval=5 * 60 * 1000, key="vessel_refresh")
 inject_global_css()
 navbar(current="Vessel Tracking")
 page_header(
