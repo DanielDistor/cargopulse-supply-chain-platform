@@ -167,59 +167,90 @@ _PH = (
     '{label}<br>Check back in a few hours</div></div>'
 )
 
-_CARD = (
-    'background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
-    'padding:8px 12px 4px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);'
-)
+# Build chart HTML fragments — rendered inside one iframe for full border-radius control
+_CHART_H = 220  # total iframe height
 
-_ac_left, _ac_right = st.columns(2)
+if _daily:
+    _fig7 = go.Figure(go.Scatter(
+        x=[str(r["day"]) for r in _daily],
+        y=[int(r["vessel_count"]) for r in _daily],
+        mode="lines+markers",
+        line=dict(color="#3b82f6", width=2.5),
+        marker=dict(color="#3b82f6", size=5),
+        fill="tozeroy", fillcolor="rgba(59,130,246,0.08)",
+        hovertemplate="%{x}<br><b>%{y} vessels</b><extra></extra>",
+    ))
+    _fig7.update_layout(
+        **{k: v for k, v in _CL.items() if k != "xaxis"},
+        title=dict(text="<b>Fleet Activity — Last 7 Days</b>",
+                   font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
+        xaxis=dict(**_CL["xaxis"], tickformat="%b %d", dtick=86400000),
+    )
+    _html7 = pio.to_html(_fig7, include_plotlyjs=False, full_html=False,
+                         config={"displayModeBar": False, "responsive": True})
+else:
+    _html7 = _PH.format(icon="📡", label="Fleet Activity — Last 7 Days")
 
-with _ac_left:
-    st.markdown(f'<div style="{_CARD}">', unsafe_allow_html=True)
-    if _daily:
-        _fig7 = go.Figure(go.Scatter(
-            x=[str(r["day"]) for r in _daily],
-            y=[int(r["vessel_count"]) for r in _daily],
-            mode="lines+markers",
-            line=dict(color="#3b82f6", width=2.5),
-            marker=dict(color="#3b82f6", size=5),
-            fill="tozeroy", fillcolor="rgba(59,130,246,0.08)",
-            hovertemplate="%{x}<br><b>%{y} vessels</b><extra></extra>",
-        ))
-        _fig7.update_layout(
-            **{k: v for k, v in _CL.items() if k != "xaxis"},
-            title=dict(text="<b>Fleet Activity — Last 7 Days</b>",
-                       font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
-            xaxis=dict(**_CL["xaxis"], tickformat="%b %d", dtick=86400000),
-        )
-        st.plotly_chart(_fig7, use_container_width=True, config={"displayModeBar": False})
-    else:
-        st.markdown(_PH.format(icon="📡", label="Fleet Activity — Last 7 Days"),
-                    unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+if _h24:
+    _fig24 = go.Figure(go.Scatter(
+        x=[str(r["logged_at"]) for r in _h24],
+        y=[r["total"] for r in _h24],
+        mode="lines",
+        line=dict(color="#22c55e", width=2.5),
+        fill="tozeroy", fillcolor="rgba(34,197,94,0.08)",
+        hovertemplate="%{x}<br><b>%{y} vessels</b><extra></extra>",
+    ))
+    _fig24.update_layout(
+        **{k: v for k, v in _CL.items() if k != "xaxis"},
+        title=dict(text="<b>Fleet Activity — Last 24 Hours</b>",
+                   font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
+        xaxis=dict(**_CL["xaxis"], tickformat="%H:00", dtick=3600000),
+    )
+    _html24 = pio.to_html(_fig24, include_plotlyjs=False, full_html=False,
+                          config={"displayModeBar": False, "responsive": True})
+else:
+    _html24 = _PH.format(icon="🕐", label="Fleet Activity — Last 24 Hours")
 
-with _ac_right:
-    st.markdown(f'<div style="{_CARD}">', unsafe_allow_html=True)
-    if _h24:
-        _fig24 = go.Figure(go.Scatter(
-            x=[str(r["logged_at"]) for r in _h24],
-            y=[r["total"] for r in _h24],
-            mode="lines",
-            line=dict(color="#22c55e", width=2.5),
-            fill="tozeroy", fillcolor="rgba(34,197,94,0.08)",
-            hovertemplate="%{x}<br><b>%{y} vessels</b><extra></extra>",
-        ))
-        _fig24.update_layout(
-            **{k: v for k, v in _CL.items() if k != "xaxis"},
-            title=dict(text="<b>Fleet Activity — Last 24 Hours</b>",
-                       font=dict(color="#1e293b", size=12), x=0, xanchor="left"),
-            xaxis=dict(**_CL["xaxis"], tickformat="%H:00", dtick=3600000),
-        )
-        st.plotly_chart(_fig24, use_container_width=True, config={"displayModeBar": False})
-    else:
-        st.markdown(_PH.format(icon="🕐", label="Fleet Activity — Last 24 Hours"),
-                    unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+components.html(f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+*,*::before,*::after{{margin:0;padding:0;box-sizing:border-box;}}
+html,body{{width:100%;height:{_CHART_H}px;background:transparent;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}}
+.row{{display:flex;gap:12px;height:100%;}}
+.card{{
+    flex:1;min-width:0;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    overflow:hidden;
+    padding:8px 12px 4px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);
+}}
+</style>
+</head>
+<body>
+<div class="row">
+    <div class="card">{_html7}</div>
+    <div class="card">{_html24}</div>
+</div>
+<script>
+window.addEventListener('load',function(){{
+    document.querySelectorAll('.js-plotly-plot').forEach(function(el){{
+        if(window.Plotly) Plotly.Plots.resize(el);
+    }});
+    setTimeout(function(){{
+        document.querySelectorAll('.js-plotly-plot').forEach(function(el){{
+            if(window.Plotly) Plotly.Plots.resize(el);
+        }});
+    }},300);
+}});
+</script>
+</body>
+</html>""", height=_CHART_H + 2, scrolling=False)
 
 st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
 
