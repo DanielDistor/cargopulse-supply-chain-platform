@@ -167,9 +167,15 @@ _PH = (
     '{label}<br>Check back in a few hours</div></div>'
 )
 
+_CARD = (
+    'background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;'
+    'padding:8px 12px 4px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);'
+)
+
 _ac_left, _ac_right = st.columns(2)
 
 with _ac_left:
+    st.markdown(f'<div style="{_CARD}">', unsafe_allow_html=True)
     if _daily:
         _fig7 = go.Figure(go.Scatter(
             x=[str(r["day"]) for r in _daily],
@@ -190,8 +196,10 @@ with _ac_left:
     else:
         st.markdown(_PH.format(icon="📡", label="Fleet Activity — Last 7 Days"),
                     unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with _ac_right:
+    st.markdown(f'<div style="{_CARD}">', unsafe_allow_html=True)
     if _h24:
         _fig24 = go.Figure(go.Scatter(
             x=[str(r["logged_at"]) for r in _h24],
@@ -211,6 +219,7 @@ with _ac_right:
     else:
         st.markdown(_PH.format(icon="🕐", label="Fleet Activity — Last 24 Hours"),
                     unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
 
